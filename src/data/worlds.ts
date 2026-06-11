@@ -154,6 +154,18 @@ function scream(telegraph: number, damage: number, fireLock = 1.0, stagger = 1.5
   return { type: 'scream', telegraph, damage, fireLock, stagger };
 }
 
+// ---------- 이미지 에셋 경로 (public/assets/images) ----------
+
+export function worldImage(idx: number): string {
+  return `/assets/images/world_${idx + 1}_${WORLDS[idx].id}.png`;
+}
+
+export function rewardImage(itemId: string): string {
+  return `/assets/images/reward_${itemId}.png`;
+}
+
+export const TITLE_BG_IMAGE = '/assets/images/title_bg.png';
+
 // ---------- 보상 아이템 ----------
 
 export const REWARD_ITEMS: Record<string, RewardItemDef> = {

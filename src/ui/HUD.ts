@@ -22,14 +22,17 @@ export class HUD {
   private levelEl!: HTMLElement;
   private expFill!: HTMLElement;
 
+  private hpBar!: HTMLElement;
+
   private bossWrap!: HTMLElement;
   private bossName!: HTMLElement;
   private bossFill!: HTMLElement;
   private bossTrail!: HTMLElement;
   private bossTicks!: HTMLElement;
   private bossTrailValue = 1;
+  private prevBossPhase = -1;
 
-  private skillBtns: { el: HTMLElement; cd: HTMLElement; badge: HTMLElement }[] = [];
+  private skillBtns: { el: HTMLElement; cd: HTMLElement; badge: HTMLElement; wasCooling: boolean }[] = [];
   private floaters!: HTMLElement;
   private vignette!: HTMLElement;
   private shade!: HTMLElement;
@@ -68,8 +71,8 @@ export class HUD {
         </div>
       </div>
       <div class="skills">
-        <button class="skill-btn" data-skill="blast">💥<div class="skill-cd"></div><span class="auto-badge"></span></button>
-        <button class="skill-btn" data-skill="dash">⚡<div class="skill-cd"></div><span class="auto-badge"></span></button>
+        <button class="skill-btn" data-skill="blast">💥<div class="skill-cd"></div><span class="auto-badge"></span><span class="skill-label" data-skill-label="blast"></span></button>
+        <button class="skill-btn" data-skill="dash">⚡<div class="skill-cd"></div><span class="auto-badge"></span><span class="skill-label" data-skill-label="dash"></span></button>
       </div>
       <div class="floaters"></div>
       <div class="vignette"></div>
@@ -79,6 +82,7 @@ export class HUD {
     `;
     this.root.appendChild(this.el);
 
+    this.hpBar = this.q('.hp-bar');
     this.hpFill = this.q('.hp-fill');
     this.hpText = this.q('.hp-text');
     this.distEl = this.q('.distance');
@@ -112,6 +116,7 @@ export class HUD {
         el: btn,
         cd: btn.querySelector('.skill-cd')!,
         badge: btn.querySelector('.auto-badge')!,
+        wasCooling: false,
       });
     });
   }
@@ -143,16 +148,18 @@ export class HUD {
     this.hpFill.style.width = `${hpFrac * 100}%`;
     this.hpFill.style.background = hpFrac > 0.5 ? '#4ade80' : hpFrac > 0.25 ? '#facc15' : '#ef4444';
     this.hpText.textContent = `❤ ${Math.ceil(p.hp)}/${p.maxHp}`;
+    this.hpBar.classList.toggle('danger', hpFrac <= 0.25 && hpFrac > 0);
 
     this.distEl.textContent = `🏃 ${Math.floor(game.distance)}${t('misc.meters')}`;
-    this.scoreEl.textContent = `${game.score()}`;
+    this.scoreEl.textContent = `⭐ ${game.score().toLocaleString()}`;
     this.coinEl.textContent = `${game.inventory.coins}`;
     this.gemEl.textContent = `${game.inventory.gems}`;
     this.levelEl.textContent = `${p.level}`;
     this.expFill.style.width = `${(p.exp / p.expToNext) * 100}%`;
 
-    // 스킬 쿨다운 원형 게이지 + AUTO 배지 (§8.2, §13.1)
+    // 스킬 쿨다운 원형 게이지 + AUTO 배지 + READY 글로우 (§8.2, §13.1)
     const ids: ('blast' | 'dash')[] = ['blast', 'dash'];
+    const labelKeys: Record<string, string> = { blast: 'hud.skill.blast', dash: 'hud.skill.dash' };
     this.skillBtns.forEach((btn, i) => {
       const id = ids[i];
       const remain = game.combat.cooldowns[id];
@@ -162,12 +169,22 @@ export class HUD {
         btn.cd.style.display = 'block';
         btn.cd.style.background = `conic-gradient(rgba(0,0,0,0.72) ${frac * 360}deg, transparent 0deg)`;
         btn.el.classList.add('cooling');
+        btn.el.classList.remove('ready');
+        btn.wasCooling = true;
       } else {
         btn.cd.style.display = 'none';
         btn.el.classList.remove('cooling');
+        if (btn.wasCooling) {
+          btn.el.classList.remove('ready');
+          void btn.el.offsetWidth; // reflow로 애니메이션 재시작
+          btn.el.classList.add('ready');
+          btn.wasCooling = false;
+        }
       }
       btn.badge.textContent = t('hud.auto');
       btn.badge.style.display = game.autoSkill ? 'block' : 'none';
+      const labelEl = btn.el.querySelector<HTMLElement>('[data-skill-label]');
+      if (labelEl) labelEl.textContent = t(labelKeys[id]);
     });
 
     // 보스 체력바
@@ -176,6 +193,14 @@ export class HUD {
       const frac = boss.hpFrac;
       this.bossFill.style.width = `${frac * 100}%`;
       this.bossFill.style.background = PHASE_COLORS[Math.min(boss.phaseIdx, PHASE_COLORS.length - 1)];
+      // 페이즈 전환 셰이크
+      if (this.prevBossPhase !== -1 && boss.phaseIdx !== this.prevBossPhase) {
+        this.bossWrap.classList.remove('phase-break');
+        void this.bossWrap.offsetWidth;
+        this.bossWrap.classList.add('phase-break');
+        this.bossWrap.addEventListener('animationend', () => this.bossWrap.classList.remove('phase-break'), { once: true });
+      }
+      this.prevBossPhase = boss.phaseIdx;
       // 흰색 잔상 (딜레이 감소 — §9.4)
       this.bossTrailValue = Math.max(frac, this.bossTrailValue - dt * 0.25);
       this.bossTrail.style.width = `${this.bossTrailValue * 100}%`;
@@ -203,6 +228,7 @@ export class HUD {
     this.bossWrap.hidden = false;
     this.bossName.textContent = t(nameKey);
     this.bossTrailValue = 1;
+    this.prevBossPhase = 0;
     // 페이즈 경계 눈금 (§9.4)
     this.bossTicks.innerHTML = '';
     phaseFroms
@@ -217,6 +243,7 @@ export class HUD {
 
   hideBossBar(): void {
     this.bossWrap.hidden = true;
+    this.prevBossPhase = -1;
   }
 
   // ----------------------------------------------------------

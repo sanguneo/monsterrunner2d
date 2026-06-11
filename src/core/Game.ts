@@ -164,6 +164,8 @@ export class Game {
   private segmentLength = CONFIG.world.segment1Length;
   private tutorial: Tutorial | null = null;
   private checkpoint: Checkpoint | null = null;
+  /** 스테이지 인트로(월드 이미지) 표시 중 — 0이면 비활성 */
+  private stageIntroTimer = 0;
   private env: Environment;
   private lastTime = 0;
   private accumulator = 0;
@@ -369,6 +371,14 @@ export class Game {
 
       case 'RUNNING_1':
       case 'RUNNING_2': {
+        // 스테이지 인트로 동안 출발 대기 (월드 이미지 표시)
+        if (this.stageIntroTimer > 0) {
+          this.stageIntroTimer -= dt;
+          this.player.update(dt, this.input, false);
+          this.env.update(this.player.z);
+          if (this.stageIntroTimer <= 0) this.dismissStageIntro();
+          break;
+        }
         this.runElapsed += dt;
         const base = Math.min(
           CONFIG.run.speedStart + CONFIG.run.accel * this.runElapsed,
@@ -475,7 +485,9 @@ export class Game {
         this.segmentStart = this.distance;
         this.segmentLength = CONFIG.world.segment1Length;
         this.spawner.reset();
-        this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
+        // 스테이지 표시 이미지 먼저 노출 후 출발
+        this.stageIntroTimer = 3.0;
+        this.screens.showStageIntro(this.worldIdx);
         break;
 
       case 'RUNNING_2':
@@ -516,7 +528,7 @@ export class Game {
         this.persistItem(this.world.reward);
         this.cosmetics.apply(this.player, this.inventory);
         this.unlockWorld(this.worldIdx + 1);
-        this.screens.showReward({ emoji: item.emoji, nameKey: item.nameKey });
+        this.screens.showReward({ itemId: this.world.reward, emoji: item.emoji, nameKey: item.nameKey });
         this.sound.play('victory');
         break;
       }
@@ -589,9 +601,23 @@ export class Game {
 
   togglePause(): void {
     if (!this.isPlayState) return;
+    if (this.stageIntroTimer > 0) {
+      this.dismissStageIntro(); // 인트로 중 일시정지 입력 = 인트로 종료
+      return;
+    }
     this.paused = !this.paused;
     if (this.paused) this.screens.showPause();
     else this.screens.hide();
+  }
+
+  /** 스테이지 인트로 종료 → 출발 (탭/타이머) */
+  dismissStageIntro(): void {
+    // 타이머 만료 경로에서는 이미 0 이하일 수 있으므로 오버레이 표시 여부로 판정
+    if (this.stageIntroTimer <= 0 && !this.screens.isStageIntroVisible) return;
+    this.stageIntroTimer = 0;
+    this.screens.hideStageIntro();
+    this.input.clear();
+    this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
   }
 
   setAutoSkill(on: boolean): void {
@@ -822,6 +848,7 @@ export class Game {
     this.checkpoint = null;
     this.tutorial = null;
     this.paused = false;
+    this.stageIntroTimer = 0;
     this.isNewRecord = false;
     this.finalScore = 0;
     this.applyWorldTheme();

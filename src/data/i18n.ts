@@ -16,6 +16,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'title.highscore': '최고 점수',
     'title.selectWorld': '월드 선택',
 
+    'stage.world': '월드',
+    'stage.tapToStart': '화면을 눌러 출발!',
+
     'world.school': '학교 유령',
     'world.zombie': '좀비 마을',
     'world.lab': '프랑켄슈타인 연구소',
@@ -30,6 +33,8 @@ const STRINGS: Record<Locale, Record<string, string>> = {
 
     'hud.auto': 'AUTO',
     'hud.phase': '페이즈',
+    'hud.skill.blast': '폭발',
+    'hud.skill.dash': '돌진',
 
     'boss.ghostTeacher': '유령 선생님',
     'boss.ghostGirl': '학교 괴담 소녀',
@@ -100,6 +105,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'title.highscore': 'High Score',
     'title.selectWorld': 'Select World',
 
+    'stage.world': 'WORLD',
+    'stage.tapToStart': 'Tap to start!',
+
     'world.school': 'School Ghosts',
     'world.zombie': 'Zombie Village',
     'world.lab': 'Frankenstein Lab',
@@ -114,6 +122,8 @@ const STRINGS: Record<Locale, Record<string, string>> = {
 
     'hud.auto': 'AUTO',
     'hud.phase': 'Phase',
+    'hud.skill.blast': 'BLAST',
+    'hud.skill.dash': 'DASH',
 
     'boss.ghostTeacher': 'Ghost Teacher',
     'boss.ghostGirl': 'Phantom School Girl',

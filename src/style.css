@@ -46,6 +46,7 @@ body {
 #hud {
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
 .hud-top {
@@ -83,6 +84,12 @@ body {
   transition: width 0.15s ease-out;
 }
 
+@keyframes hpDanger {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3); }
+  50%       { box-shadow: 0 0 0 4px rgba(239, 68, 68, 1.0), 0 0 12px rgba(239, 68, 68, 0.5); }
+}
+.hp-bar.danger { animation: hpDanger 1.2s ease-in-out infinite; }
+
 .hp-text {
   position: absolute;
   inset: 0;
@@ -116,6 +123,7 @@ body {
   width: 90px;
   height: 8px;
   background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -212,6 +220,15 @@ body {
   inset: 0;
 }
 
+@keyframes bossPhaseBreak {
+  0%   { transform: translateX(-50%) translateX(-6px); }
+  25%  { transform: translateX(-50%) translateX(6px); }
+  50%  { transform: translateX(-50%) translateX(-3px); }
+  75%  { transform: translateX(-50%) translateX(3px); }
+  100% { transform: translateX(-50%) translateX(0); }
+}
+.boss-wrap.phase-break { animation: bossPhaseBreak 0.4s ease-out; }
+
 /* ---------------- 스킬 버튼 ---------------- */
 
 .skills {
@@ -261,6 +278,29 @@ body {
   letter-spacing: 0.5px;
   display: none;
 }
+
+.skill-label {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes skillReady {
+  0%   { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.9); transform: scale(1); }
+  40%  { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0.5); transform: scale(1.18); }
+  70%  { box-shadow: 0 0 0 14px rgba(250, 204, 21, 0.1); transform: scale(1.0); }
+  100% { box-shadow: 0 0 6px 2px rgba(250, 204, 21, 0.35); transform: scale(1.0); }
+}
+.skill-btn.ready { animation: skillReady 0.5s ease-out forwards; border-color: rgba(250, 204, 21, 0.9); }
 
 /* ---------------- 플로팅 텍스트 ---------------- */
 
@@ -377,12 +417,21 @@ body {
 #screen-overlay {
   position: absolute;
   inset: 0;
+  z-index: 10; /* HUD 위에 — 스테이지 인트로/일시정지 중 HUD 가림 */
   pointer-events: auto;
   background: rgba(10, 6, 20, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow-y: auto;
+}
+
+/* 타이틀 배경 이미지 (어두운 그라데이션으로 가독성 확보) */
+#screen-overlay.title-bg {
+  background:
+    linear-gradient(rgba(13, 8, 26, 0.45), rgba(13, 8, 26, 0.88)),
+    url('/assets/images/title_bg.png') center / cover no-repeat,
+    #15101f;
 }
 
 .screen {
@@ -393,6 +442,20 @@ body {
   padding: 28px 22px;
   width: min(92vw, 400px);
   text-align: center;
+}
+
+/* 일시정지 — 게임 화면 위 모달 카드 */
+.pause-screen {
+  width: min(86vw, 340px);
+  background: rgba(20, 14, 36, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.pause-screen h2 {
+  font-size: 24px;
+  font-weight: 900;
 }
 
 .game-logo {
@@ -424,7 +487,7 @@ body {
 
 .btn {
   pointer-events: auto;
-  min-width: 220px;
+  width: 100%; /* 화면 내 박스/패널과 같은 레일에 정렬 — 텍스트 길이 무관 동일 폭 */
   min-height: 54px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -460,44 +523,68 @@ body {
 }
 
 .world-grid {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 56px); /* 6개 월드 → 3+3 대칭 */
+  gap: 10px 18px;
   justify-content: center;
-  flex-wrap: wrap;
 }
 
 .world-btn {
   pointer-events: auto;
   position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.08);
+  background-size: cover;
+  background-position: center;
   font-size: 22px;
   cursor: pointer;
-  transition: transform 0.08s, border-color 0.15s;
+  transition: transform 0.08s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .world-btn.selected {
-  border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.25);
-  transform: scale(1.08);
+  border-color: #c084fc;
+  box-shadow: 0 0 14px rgba(192, 132, 252, 0.8);
+  transform: scale(1.12);
 }
 
 .world-btn.locked {
-  opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* 잠금 어둡기: filter 대신 오버레이 — 🔒 아이콘이 같이 어두워지지 않도록 */
+.world-btn.locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(10, 6, 20, 0.6);
+}
+
+.world-lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  z-index: 1;
+  filter: drop-shadow(0 1px 3px #000);
 }
 
 .world-num {
   position: absolute;
-  bottom: -2px;
-  right: 2px;
-  font-size: 10px;
+  bottom: -4px;
+  right: -2px;
+  font-size: 11px;
   font-weight: 800;
   color: #fff;
-  text-shadow: 0 1px 2px #000;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  padding: 0 5px;
+  z-index: 1;
 }
 
 .world-name {
@@ -539,7 +626,6 @@ body {
   align-items: center;
   font-size: 15px;
   width: 100%;
-  max-width: 280px;
 }
 
 .toggle {
@@ -597,14 +683,81 @@ body {
   color: #ffd54a;
 }
 
-.reward-cape {
-  font-size: 80px;
-  animation: capeSpin 1.6s ease-in-out infinite;
+/* 보상 아이템 대형 이미지 */
+.reward-img {
+  width: min(64vw, 300px);
+  height: min(64vw, 300px);
+  object-fit: cover;
+  border-radius: 24px;
+  border: 3px solid rgba(255, 213, 74, 0.7);
+  box-shadow: 0 0 36px rgba(255, 213, 74, 0.45), 0 8px 28px rgba(0, 0, 0, 0.6);
+  animation: rewardPop 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both, rewardGlow 2s ease-in-out 0.7s infinite;
 }
 
-@keyframes capeSpin {
-  0%, 100% { transform: rotate(-8deg) scale(1); }
-  50% { transform: rotate(8deg) scale(1.12); }
+@keyframes rewardPop {
+  0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes rewardGlow {
+  0%, 100% { box-shadow: 0 0 24px rgba(255, 213, 74, 0.35), 0 8px 28px rgba(0, 0, 0, 0.6); }
+  50% { box-shadow: 0 0 48px rgba(255, 213, 74, 0.75), 0 8px 28px rgba(0, 0, 0, 0.6); }
+}
+
+/* ---------------- 스테이지 인트로 ---------------- */
+
+.stage-intro {
+  cursor: pointer;
+  pointer-events: auto;
+  gap: 10px;
+}
+
+.stage-label {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: #c084fc;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(192, 132, 252, 0.8);
+  animation: stageFade 0.5s ease-out both;
+}
+
+.stage-img {
+  width: min(72vw, 340px);
+  height: min(72vw, 340px);
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid rgba(192, 132, 252, 0.55);
+  box-shadow: 0 0 44px rgba(124, 58, 237, 0.55), 0 10px 32px rgba(0, 0, 0, 0.7);
+  animation: stagePop 0.65s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.stage-name {
+  font-size: 26px;
+  font-weight: 900;
+  text-shadow: 0 0 16px rgba(167, 139, 250, 0.8), 0 2px 6px #000;
+  animation: stageFade 0.6s ease-out 0.15s both;
+}
+
+.stage-tap {
+  font-size: 14px;
+  opacity: 0.75;
+  animation: stageTap 1.2s ease-in-out 0.6s infinite both;
+}
+
+@keyframes stagePop {
+  0% { opacity: 0; transform: scale(0.4); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes stageFade {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes stageTap {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 
 .reward-text {

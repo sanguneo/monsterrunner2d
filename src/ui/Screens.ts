@@ -5,7 +5,7 @@
 
 import { t, getLocale, setLocale, onLocaleChange } from '../data/i18n';
 import type { Locale } from '../data/i18n';
-import { WORLDS } from '../data/worlds';
+import { WORLDS, REWARD_ITEMS, worldImage, rewardImage, TITLE_BG_IMAGE } from '../data/worlds';
 import type { Game } from '../core/Game';
 
 export interface ResultData {
@@ -22,6 +22,7 @@ export interface ResultData {
 }
 
 export interface RewardData {
+  itemId: string;
   emoji: string;
   nameKey: string;
 }
@@ -34,7 +35,7 @@ export interface GameOverData {
   canRevive: boolean;
 }
 
-type ScreenName = 'title' | 'pause' | 'result' | 'gameover' | 'reward' | null;
+type ScreenName = 'title' | 'pause' | 'result' | 'gameover' | 'reward' | 'stageintro' | null;
 
 export class Screens {
   private root: HTMLElement;
@@ -66,6 +67,11 @@ export class Screens {
     this.root.appendChild(this.tutSkip);
 
     onLocaleChange(() => this.rerender());
+
+    // 이미지 에셋 프리로드 (스테이지 인트로/보상 화면 즉시 표시용)
+    new Image().src = TITLE_BG_IMAGE;
+    WORLDS.forEach((_, i) => (new Image().src = worldImage(i)));
+    Object.keys(REWARD_ITEMS).forEach((id) => (new Image().src = rewardImage(id)));
   }
 
   private rerender(): void {
@@ -79,7 +85,15 @@ export class Screens {
 
   hide(): void {
     this.overlay.hidden = true;
+    this.overlay.classList.remove('title-bg');
     this.current = null;
+  }
+
+  /** 화면 표시 공통 준비 — 타이틀 배경 이미지는 타이틀에서만 */
+  private open(name: Exclude<ScreenName, null>): void {
+    this.current = name;
+    this.overlay.hidden = false;
+    this.overlay.classList.toggle('title-bg', name === 'title');
   }
 
   // ----------------------------------------------------------
@@ -87,19 +101,19 @@ export class Screens {
   // ----------------------------------------------------------
 
   showTitle(): void {
-    this.current = 'title';
+    this.open('title');
     const high = this.game.loadHighScore();
     const unlocked = this.game.unlockedWorldIdx();
     const worldBtns = WORLDS.map((w, i) => {
       const locked = i > unlocked;
       const selected = i === this.game.worldIdx;
       return `<button class="world-btn ${selected ? 'selected' : ''} ${locked ? 'locked' : ''}"
-        data-world="${i}" ${locked ? 'disabled' : ''} title="${t(w.nameKey)}">
-        ${locked ? '🔒' : w.emoji}<span class="world-num">${i + 1}</span>
+        data-world="${i}" ${locked ? 'disabled' : ''} title="${t(w.nameKey)}"
+        style="background-image:url('${worldImage(i)}')">
+        ${locked ? '<span class="world-lock">🔒</span>' : ''}<span class="world-num">${i + 1}</span>
       </button>`;
     }).join('');
 
-    this.overlay.hidden = false;
     this.overlay.innerHTML = `
       <div class="screen title-screen">
         <div class="game-logo">👻</div>
@@ -151,8 +165,7 @@ export class Screens {
   // ----------------------------------------------------------
 
   showPause(): void {
-    this.current = 'pause';
-    this.overlay.hidden = false;
+    this.open('pause');
     this.overlay.innerHTML = `
       <div class="screen pause-screen">
         <h2>${t('pause.title')}</h2>
@@ -182,13 +195,12 @@ export class Screens {
   // ----------------------------------------------------------
 
   showReward(data: RewardData): void {
-    this.current = 'reward';
+    this.open('reward');
     this.currentData = data;
-    this.overlay.hidden = false;
     this.overlay.innerHTML = `
       <div class="screen reward-screen" data-act="continue">
         <h2 class="reward-title">${t('reward.title')}</h2>
-        <div class="reward-cape">${data.emoji}</div>
+        <img class="reward-img" src="${rewardImage(data.itemId)}" alt="${t(data.nameKey)}" />
         <p class="reward-text">${data.emoji} ${t(data.nameKey)} ${t('reward.got')}</p>
         <p class="reward-tap">${t('reward.tap')}</p>
       </div>
@@ -197,13 +209,38 @@ export class Screens {
   }
 
   // ----------------------------------------------------------
+  // 스테이지 인트로 — 월드 이미지 먼저 표시 후 출발
+  // ----------------------------------------------------------
+
+  showStageIntro(worldIdx: number): void {
+    this.open('stageintro');
+    const w = WORLDS[worldIdx];
+    this.overlay.innerHTML = `
+      <div class="screen stage-intro" data-act="go">
+        <div class="stage-label">${t('stage.world')} ${worldIdx + 1}</div>
+        <img class="stage-img" src="${worldImage(worldIdx)}" alt="${t(w.nameKey)}" />
+        <h2 class="stage-name">${w.emoji} ${t(w.nameKey)}</h2>
+        <p class="stage-tap">${t('stage.tapToStart')}</p>
+      </div>
+    `;
+    this.bind('go', () => this.game.dismissStageIntro());
+  }
+
+  hideStageIntro(): void {
+    if (this.current === 'stageintro') this.hide();
+  }
+
+  get isStageIntroVisible(): boolean {
+    return this.current === 'stageintro';
+  }
+
+  // ----------------------------------------------------------
   // 결과 화면 (§16)
   // ----------------------------------------------------------
 
   showResult(data: ResultData): void {
-    this.current = 'result';
+    this.open('result');
     this.currentData = data;
-    this.overlay.hidden = false;
     this.overlay.innerHTML = `
       <div class="screen result-screen">
         <h2>🎉 ${t('result.title')}</h2>
@@ -233,9 +270,8 @@ export class Screens {
   // ----------------------------------------------------------
 
   showGameOver(data: GameOverData): void {
-    this.current = 'gameover';
+    this.open('gameover');
     this.currentData = data;
-    this.overlay.hidden = false;
     this.overlay.innerHTML = `
       <div class="screen gameover-screen">
         <h2>💀 ${t('over.title')}</h2>
