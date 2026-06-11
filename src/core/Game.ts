@@ -1,0 +1,832 @@
+// ============================================================
+// Game — 상태머신 + 고정 타임스텝 게임루프 (§15)
+// TITLE → (TUTORIAL) → RUNNING_1 → MIDBOSS → RUNNING_2 →
+// FINALBOSS → REWARD → RESULT / GAMEOVER(체크포인트 부활)
+// ============================================================
+
+import * as THREE from 'three';
+import { CONFIG, laneX } from '../data/config';
+import { t } from '../data/i18n';
+import { Input } from './Input';
+import { CameraController } from './Camera';
+import { Tutorial } from './Tutorial';
+import { Player } from '../entities/Player';
+import { Monster } from '../entities/Monster';
+import { Boss } from '../entities/Boss';
+import { WORLDS, REWARD_ITEMS } from '../data/worlds';
+import type { WorldDef, WorldTheme, MonsterDef } from '../data/worlds';
+import { Obstacle, applyObstacleTheme } from '../entities/Obstacle';
+import type { ObstacleType } from '../entities/Obstacle';
+import { Pickup } from '../entities/Pickup';
+import type { PickupType } from '../entities/Pickup';
+import { Projectile } from '../entities/Projectile';
+import { Spawner } from '../systems/Spawner';
+import { Combat } from '../systems/Combat';
+import { Progression } from '../systems/Progression';
+import { Inventory } from '../systems/Inventory';
+import { Cosmetics } from '../systems/Cosmetics';
+import { SoundManager } from '../systems/Sound';
+import { HUD } from '../ui/HUD';
+import { Screens } from '../ui/Screens';
+
+export type GameStateName =
+  | 'TITLE'
+  | 'TUTORIAL'
+  | 'RUNNING_1'
+  | 'MIDBOSS'
+  | 'RUNNING_2'
+  | 'FINALBOSS'
+  | 'REWARD'
+  | 'RESULT'
+  | 'GAMEOVER';
+
+interface Checkpoint {
+  state: 'MIDBOSS' | 'FINALBOSS';
+  player: {
+    hp: number;
+    maxHp: number;
+    attack: number;
+    critChance: number;
+    level: number;
+    exp: number;
+    expToNext: number;
+    z: number;
+  };
+  inventory: ReturnType<Inventory['snapshot']>;
+  stats: { kills: number; bossKills: number };
+  distance: number;
+  runElapsed: number;
+}
+
+// ------------------------------------------------------------
+// 환경(복도 배경) — 바닥/레인 점선/측벽 재활용 스크롤
+// ------------------------------------------------------------
+
+class Environment {
+  private floor: THREE.Mesh;
+  private dashes: THREE.Mesh[] = [];
+  private walls: THREE.Mesh[] = [];
+  private readonly dashSpan = 180;
+  private readonly wallSpan = 192;
+  private floorMat: THREE.MeshStandardMaterial;
+  private wallMatA: THREE.MeshStandardMaterial;
+  private wallMatB: THREE.MeshStandardMaterial;
+
+  constructor(scene: THREE.Scene) {
+    const floorGeo = new THREE.PlaneGeometry(10, 240);
+    this.floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3f63 });
+    this.floor = new THREE.Mesh(floorGeo, this.floorMat);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.position.y = -0.01;
+    scene.add(this.floor);
+
+    // 레인 경계 점선
+    const dashGeo = new THREE.BoxGeometry(0.12, 0.02, 2.2);
+    const dashMat = new THREE.MeshBasicMaterial({ color: 0xbcb3d8 });
+    for (let side = 0; side < 2; side++) {
+      const x = side === 0 ? -CONFIG.lanes.spacing / 2 : CONFIG.lanes.spacing / 2;
+      for (let i = 0; i < 30; i++) {
+        const d = new THREE.Mesh(dashGeo, dashMat);
+        d.position.set(x, 0.01, i * 6);
+        scene.add(d);
+        this.dashes.push(d);
+      }
+    }
+
+    // 측벽 (월드 테마별 교차 톤)
+    const wallGeo = new THREE.BoxGeometry(0.6, 5, 11);
+    this.wallMatA = new THREE.MeshStandardMaterial({ color: 0x37304f });
+    this.wallMatB = new THREE.MeshStandardMaterial({ color: 0x2a2440 });
+    for (let side = 0; side < 2; side++) {
+      const x = side === 0 ? -5.2 : 5.2;
+      for (let i = 0; i < 16; i++) {
+        const w = new THREE.Mesh(wallGeo, i % 2 === 0 ? this.wallMatA : this.wallMatB);
+        w.position.set(x, 2.5, i * 12);
+        scene.add(w);
+        this.walls.push(w);
+      }
+    }
+  }
+
+  /** 월드 테마 색상 적용 */
+  setTheme(theme: WorldTheme): void {
+    this.floorMat.color.setHex(theme.floor);
+    this.wallMatA.color.setHex(theme.wallA);
+    this.wallMatB.color.setHex(theme.wallB);
+  }
+
+  update(playerZ: number): void {
+    this.floor.position.z = playerZ + 80;
+    for (const d of this.dashes) {
+      if (d.position.z < playerZ - 20) d.position.z += this.dashSpan;
+    }
+    for (const w of this.walls) {
+      if (w.position.z < playerZ - 24) w.position.z += this.wallSpan;
+    }
+  }
+}
+
+// ------------------------------------------------------------
+
+export class Game {
+  readonly scene: THREE.Scene;
+  readonly renderer: THREE.WebGLRenderer;
+  readonly cameraCtl: CameraController;
+  readonly input: Input;
+  readonly sound: SoundManager;
+  readonly hud: HUD;
+  readonly screens: Screens;
+
+  readonly player: Player;
+  readonly combat: Combat;
+  readonly spawner: Spawner;
+  readonly progression: Progression;
+  readonly inventory: Inventory;
+  readonly cosmetics: Cosmetics;
+
+  monsters: Monster[] = [];
+  obstacles: Obstacle[] = [];
+  pickups: Pickup[] = [];
+  projectiles: Projectile[] = [];
+  boss: Boss | null = null;
+
+  state: GameStateName = 'TITLE';
+  paused = false;
+  distance = 0;
+  runSpeed = 0;
+  autoSkill = CONFIG.accessibility.autoSkill;
+  stats = { kills: 0, bossKills: 0 };
+  /** 현재 선택/플레이 중인 월드 (0~5) */
+  worldIdx = 0;
+
+  private runElapsed = 0;
+  private segmentStart = 0;
+  private segmentLength = CONFIG.world.segment1Length;
+  private tutorial: Tutorial | null = null;
+  private checkpoint: Checkpoint | null = null;
+  private env: Environment;
+  private lastTime = 0;
+  private accumulator = 0;
+  private readonly STEP = 1 / 60;
+  private finalScore = 0;
+  private isNewRecord = false;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    this.scene = new THREE.Scene();
+    this.setMood('normal');
+
+    const hemi = new THREE.HemisphereLight(0xbcaaff, 0x2a1f3d, 1.1);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(3, 8, -4);
+    this.scene.add(hemi, dir);
+
+    this.env = new Environment(this.scene);
+    this.cameraCtl = new CameraController(window.innerWidth / window.innerHeight);
+
+    this.player = new Player();
+    this.scene.add(this.player.group);
+
+    this.sound = new SoundManager();
+    this.inventory = new Inventory();
+    this.cosmetics = new Cosmetics();
+    this.progression = new Progression(this);
+    this.combat = new Combat(this);
+    this.spawner = new Spawner(this);
+
+    this.input = new Input(canvas);
+    this.input.onAction = (a) => {
+      if (a === 'pause') this.togglePause();
+    };
+
+    this.hud = new HUD(this);
+    this.screens = new Screens(this);
+
+    window.addEventListener('resize', () => {
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.cameraCtl.resize(window.innerWidth / window.innerHeight);
+    });
+
+    this.setState('TITLE');
+  }
+
+  start(): void {
+    this.lastTime = performance.now();
+    const loop = (now: number) => {
+      const frameDt = Math.min((now - this.lastTime) / 1000, 0.1);
+      this.lastTime = now;
+      // 고정 타임스텝 업데이트 (§3.1)
+      if (!this.paused) {
+        this.accumulator += frameDt;
+        while (this.accumulator >= this.STEP) {
+          this.update(this.STEP);
+          this.accumulator -= this.STEP;
+        }
+      }
+      this.cameraCtl.update(frameDt, this.player.position, this.boss?.position ?? null);
+      this.renderer.render(this.scene, this.cameraCtl.camera);
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  // ----------------------------------------------------------
+  // 파생 상태
+  // ----------------------------------------------------------
+
+  get world(): WorldDef {
+    return WORLDS[this.worldIdx];
+  }
+
+  /** 해금된 최대 월드 인덱스 (LocalStorage) */
+  unlockedWorldIdx(): number {
+    const v = localStorage.getItem(CONFIG.storage.worldUnlockKey);
+    const n = v ? parseInt(v, 10) || 0 : 0;
+    return Math.min(n, WORLDS.length - 1);
+  }
+
+  private unlockWorld(idx: number): void {
+    if (idx > this.unlockedWorldIdx() && idx < WORLDS.length) {
+      localStorage.setItem(CONFIG.storage.worldUnlockKey, `${idx}`);
+    }
+  }
+
+  /** 획득 장비 영속 저장 / 복원 — 새 판에서도 외형 유지 */
+  private persistItem(itemId: string): void {
+    const items = this.loadPersistedItems();
+    if (!items.includes(itemId)) {
+      items.push(itemId);
+      localStorage.setItem(CONFIG.storage.itemsKey, JSON.stringify(items));
+    }
+  }
+
+  private loadPersistedItems(): string[] {
+    try {
+      const v = localStorage.getItem(CONFIG.storage.itemsKey);
+      return v ? (JSON.parse(v) as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private restorePersistedItems(): void {
+    for (const id of this.loadPersistedItems()) {
+      const item = REWARD_ITEMS[id];
+      if (item) this.inventory.grantItem(id, item.slot);
+    }
+  }
+
+  selectWorld(idx: number): void {
+    if (idx <= this.unlockedWorldIdx()) {
+      this.worldIdx = idx;
+      this.applyWorldTheme();
+      this.screens.showTitle();
+    }
+  }
+
+  private applyWorldTheme(): void {
+    this.env.setTheme(this.world.theme);
+    applyObstacleTheme(this.world.theme);
+    this.setMood('normal');
+  }
+
+  get inTutorial(): boolean {
+    return this.state === 'TUTORIAL';
+  }
+
+  get isRunningState(): boolean {
+    return this.state === 'RUNNING_1' || this.state === 'RUNNING_2';
+  }
+
+  get isBossState(): boolean {
+    return this.state === 'MIDBOSS' || this.state === 'FINALBOSS';
+  }
+
+  private get isPlayState(): boolean {
+    return this.inTutorial || this.isRunningState || this.isBossState;
+  }
+
+  /** 스킬 사용 가능 여부 — 튜토리얼은 스킬 단계부터 */
+  get skillsEnabled(): boolean {
+    return this.isRunningState || this.isBossState || this.inTutorial;
+  }
+
+  segmentProgress(): number {
+    if (this.segmentLength <= 0) return 0;
+    return Math.min(1, Math.max(0, (this.distance - this.segmentStart) / this.segmentLength));
+  }
+
+  score(): number {
+    const s = CONFIG.score;
+    return Math.floor(
+      this.distance * s.perMeter +
+        this.inventory.coins * s.perCoin +
+        this.inventory.gems * s.perGem +
+        this.stats.kills * s.perKill +
+        this.stats.bossKills * s.perBoss,
+    );
+  }
+
+  loadHighScore(): number {
+    const v = localStorage.getItem(CONFIG.storage.highScoreKey);
+    return v ? parseInt(v, 10) || 0 : 0;
+  }
+
+  private saveHighScore(): void {
+    this.finalScore = this.score();
+    const high = this.loadHighScore();
+    this.isNewRecord = this.finalScore > high;
+    if (this.isNewRecord) {
+      localStorage.setItem(CONFIG.storage.highScoreKey, `${this.finalScore}`);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // 메인 업데이트 (상태별 책임 — §15.4)
+  // ----------------------------------------------------------
+
+  private update(dt: number): void {
+    switch (this.state) {
+      case 'TITLE':
+        this.env.update(this.player.z);
+        this.player.update(dt, this.input, false);
+        break;
+
+      case 'TUTORIAL': {
+        this.runSpeed = CONFIG.world.tutorialSpeed;
+        this.player.z += this.runSpeed * dt; // 거리 미집계 (안전 학습 구간)
+        this.player.update(dt, this.input, true);
+        this.tutorial?.update(dt);
+        this.combat.update(dt);
+        this.updateEntities(dt);
+        this.env.update(this.player.z);
+        if (this.tutorial?.finished) this.finishTutorial();
+        break;
+      }
+
+      case 'RUNNING_1':
+      case 'RUNNING_2': {
+        this.runElapsed += dt;
+        const base = Math.min(
+          CONFIG.run.speedStart + CONFIG.run.accel * this.runElapsed,
+          CONFIG.run.speedMax,
+        );
+        const dashMult = this.player.dashTimer > 0 ? 1 + CONFIG.skills.slot2.speedBonus : 1;
+        this.runSpeed = base * this.player.speedMult * dashMult;
+        this.player.z += this.runSpeed * dt;
+        this.distance += this.runSpeed * dt;
+
+        this.player.update(dt, this.input, true);
+        this.spawner.update(dt);
+        this.combat.update(dt);
+        this.updateEntities(dt);
+        this.env.update(this.player.z);
+
+        // 구간 목표 도달 → 보스 진입 (§15.2)
+        if (this.distance - this.segmentStart >= this.segmentLength) {
+          this.setState(this.state === 'RUNNING_1' ? 'MIDBOSS' : 'FINALBOSS');
+        }
+        break;
+      }
+
+      case 'MIDBOSS':
+      case 'FINALBOSS': {
+        this.runSpeed = 0; // 전진 정지 (§9)
+        this.player.update(dt, this.input, true);
+        this.boss?.update(dt);
+        this.combat.update(dt);
+        this.updateEntities(dt);
+        break;
+      }
+
+      case 'REWARD':
+      case 'RESULT':
+      case 'GAMEOVER':
+        this.player.update(dt, this.input, false);
+        break;
+    }
+
+    if (this.isPlayState) this.hud.update(dt);
+  }
+
+  private updateEntities(dt: number): void {
+    const pz = this.player.z;
+    const behind = pz - CONFIG.world.despawnBehind;
+
+    for (let i = this.monsters.length - 1; i >= 0; i--) {
+      const m = this.monsters[i];
+      if (m.alive) m.update(dt, pz);
+      if (!m.alive || m.z < behind) {
+        this.scene.remove(m.mesh);
+        this.monsters.splice(i, 1);
+      }
+    }
+    for (let i = this.obstacles.length - 1; i >= 0; i--) {
+      const o = this.obstacles[i];
+      if (!o.alive || o.z < behind) {
+        this.scene.remove(o.mesh);
+        this.obstacles.splice(i, 1);
+      }
+    }
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      const pk = this.pickups[i];
+      if (pk.alive) pk.update(dt);
+      if (!pk.alive || pk.z < behind) {
+        this.scene.remove(pk.mesh);
+        this.pickups.splice(i, 1);
+      }
+    }
+  }
+
+  // ----------------------------------------------------------
+  // 상태 전환 (§15.2)
+  // ----------------------------------------------------------
+
+  setState(next: GameStateName): void {
+    this.state = next;
+    this.input.clear(); // 전환 시 입력 버퍼 초기화 (§15.4)
+
+    switch (next) {
+      case 'TITLE':
+        this.resetRun();
+        this.hud.hide();
+        this.screens.showTitle();
+        this.cameraCtl.mode = 'title';
+        break;
+
+      case 'TUTORIAL':
+        this.screens.hide();
+        this.hud.show();
+        this.cameraCtl.mode = 'follow';
+        this.tutorial = new Tutorial(this);
+        this.tutorial.start();
+        break;
+
+      case 'RUNNING_1':
+        this.clearEntities();
+        this.disposeBoss();
+        this.screens.hide();
+        this.hud.show();
+        this.hud.hideBossBar();
+        this.cameraCtl.mode = 'follow';
+        this.segmentStart = this.distance;
+        this.segmentLength = CONFIG.world.segment1Length;
+        this.spawner.reset();
+        this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
+        break;
+
+      case 'RUNNING_2':
+        this.clearEntities();
+        this.disposeBoss();
+        this.hud.hideBossBar();
+        this.cameraCtl.mode = 'follow';
+        this.segmentStart = this.distance;
+        this.segmentLength = CONFIG.world.segment2Length;
+        this.spawner.reset();
+        this.sound.play('checkpoint');
+        break;
+
+      case 'MIDBOSS':
+      case 'FINALBOSS': {
+        this.saveCheckpoint(next);
+        this.clearEntities();
+        this.disposeBoss();
+        const def = next === 'MIDBOSS' ? this.world.midBoss : this.world.finalBoss;
+        this.boss = new Boss(def, this, this.player.z + CONFIG.world.arenaBossDistance);
+        this.scene.add(this.boss.group);
+        this.hud.showBossBar(
+          def.nameKey,
+          def.phases.map((p) => p.from),
+        );
+        this.hud.showBanner(`${t('boss.incoming')} ${t(def.nameKey)}`);
+        this.cameraCtl.mode = 'boss';
+        this.sound.play('bossIntro');
+        break;
+      }
+
+      case 'REWARD': {
+        this.disposeBoss();
+        this.hud.hideBossBar();
+        // 월드 클리어 보상 장비 지급 → 외형 변화 (§12, §15.2)
+        const item = REWARD_ITEMS[this.world.reward];
+        this.inventory.grantItem(this.world.reward, item.slot);
+        this.persistItem(this.world.reward);
+        this.cosmetics.apply(this.player, this.inventory);
+        this.unlockWorld(this.worldIdx + 1);
+        this.screens.showReward({ emoji: item.emoji, nameKey: item.nameKey });
+        this.sound.play('victory');
+        break;
+      }
+
+      case 'RESULT':
+        this.saveHighScore();
+        this.hud.hide();
+        this.screens.showResult({
+          level: this.player.level,
+          kills: this.stats.kills,
+          bossKills: this.stats.bossKills,
+          coins: this.inventory.coins,
+          gems: this.inventory.gems,
+          distance: this.distance,
+          score: this.finalScore,
+          isNewRecord: this.isNewRecord,
+          hasNextWorld: this.worldIdx < WORLDS.length - 1,
+          isAllClear: this.worldIdx === WORLDS.length - 1,
+        });
+        break;
+
+      case 'GAMEOVER':
+        this.saveHighScore();
+        this.hud.hide();
+        this.hud.setShade(0);
+        this.screens.showGameOver({
+          distance: this.distance,
+          level: this.player.level,
+          coins: this.inventory.coins,
+          score: this.finalScore,
+          canRevive: this.checkpoint !== null,
+        });
+        this.sound.play('gameover');
+        break;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // 흐름 제어 (Screens/Input에서 호출)
+  // ----------------------------------------------------------
+
+  /** 타이틀 시작: 첫 진입이면 튜토리얼, 이미 봤으면 본편 (§14.3) */
+  startRun(forceTutorial: boolean): void {
+    this.resetRun();
+    const seen = sessionStorage.getItem(CONFIG.tutorial.seenFlagKey);
+    if (forceTutorial || (!seen && CONFIG.tutorial.enabled)) {
+      this.setState('TUTORIAL');
+    } else {
+      this.setState('RUNNING_1');
+    }
+  }
+
+  restartRun(): void {
+    this.resetRun();
+    this.startRun(false);
+  }
+
+  /** 결과 화면에서 다음 월드로 바로 진행 */
+  startNextWorld(): void {
+    if (this.worldIdx < WORLDS.length - 1) {
+      this.worldIdx += 1;
+      this.resetRun();
+      this.setState('RUNNING_1');
+    }
+  }
+
+  toTitle(): void {
+    this.setState('TITLE');
+  }
+
+  togglePause(): void {
+    if (!this.isPlayState) return;
+    this.paused = !this.paused;
+    if (this.paused) this.screens.showPause();
+    else this.screens.hide();
+  }
+
+  setAutoSkill(on: boolean): void {
+    this.autoSkill = on;
+  }
+
+  private finishTutorial(): void {
+    sessionStorage.setItem(CONFIG.tutorial.seenFlagKey, '1');
+    this.tutorial = null;
+    this.hud.showBanner(t('tut.ready'), 1.2);
+    // 본편 시작: 튜토리얼 진행 위치에서 이어 달린다 (거리 카운트는 0부터)
+    this.distance = 0;
+    this.runElapsed = 0;
+    this.setState('RUNNING_1');
+  }
+
+  // ----------------------------------------------------------
+  // 체크포인트 / 부활 (§15.3)
+  // ----------------------------------------------------------
+
+  private saveCheckpoint(state: 'MIDBOSS' | 'FINALBOSS'): void {
+    const p = this.player;
+    this.checkpoint = {
+      state,
+      player: {
+        hp: p.hp,
+        maxHp: p.maxHp,
+        attack: p.attack,
+        critChance: p.critChance,
+        level: p.level,
+        exp: p.exp,
+        expToNext: p.expToNext,
+        z: p.z,
+      },
+      inventory: this.inventory.snapshot(),
+      stats: { ...this.stats },
+      distance: this.distance,
+      runElapsed: this.runElapsed,
+    };
+    this.sound.play('checkpoint');
+  }
+
+  revive(): void {
+    const cp = this.checkpoint;
+    if (!cp) return;
+    const p = this.player;
+    p.resetForRun();
+    p.hp = cp.player.hp;
+    p.maxHp = cp.player.maxHp;
+    p.attack = cp.player.attack;
+    p.critChance = cp.player.critChance;
+    p.level = cp.player.level;
+    p.exp = cp.player.exp;
+    p.expToNext = cp.player.expToNext;
+    p.z = cp.player.z;
+    this.inventory.restore(cp.inventory);
+    this.cosmetics.apply(p, this.inventory);
+    this.stats = { ...cp.stats };
+    this.distance = cp.distance;
+    this.runElapsed = cp.runElapsed;
+    this.combat.reset();
+    this.screens.hide();
+    this.hud.show();
+    this.setState(cp.state);
+  }
+
+  // ----------------------------------------------------------
+  // 스폰/이벤트 헬퍼 (Spawner/Boss/Combat에서 호출)
+  // ----------------------------------------------------------
+
+  spawnMonster(def: MonsterDef, lane: number, z: number): Monster {
+    const m = new Monster(def, lane, z);
+    this.monsters.push(m);
+    this.scene.add(m.mesh);
+    return m;
+  }
+
+  spawnObstacle(type: ObstacleType, lane: number, z: number): Obstacle {
+    const o = new Obstacle(type, lane, z);
+    this.obstacles.push(o);
+    this.scene.add(o.mesh);
+    return o;
+  }
+
+  spawnPickup(type: PickupType, lane: number, z: number, y?: number): Pickup {
+    const pk = new Pickup(type, lane, z, y);
+    this.pickups.push(pk);
+    this.scene.add(pk.mesh);
+    return pk;
+  }
+
+  spawnEnemyProjectile(
+    lane: number,
+    z: number,
+    damage: number,
+    speed: number,
+    style: { color?: number; shape?: 'ball' | 'rod' | 'shard' } = {},
+  ): void {
+    const pos = new THREE.Vector3(laneX(lane), 1.0, z);
+    const vel = new THREE.Vector3(0, 0, -speed);
+    const proj = new Projectile('enemy', damage, pos, vel, false, 4.0, style);
+    this.projectiles.push(proj);
+    this.scene.add(proj.mesh);
+  }
+
+  /** 플레이어 피해 적용 — 튜토리얼 무피해 (§14) / 무적 처리 (§11.1) */
+  damagePlayer(amount: number): boolean {
+    if (this.inTutorial && CONFIG.tutorial.noDamage) return false;
+    if (!this.player.alive) return false;
+    const applied = this.player.takeDamage(amount);
+    if (applied) {
+      this.hud.damageFlash();
+      this.sound.play('hitPlayer');
+      this.cameraCtl.shake(0.08, 0.12);
+      if (!this.player.alive) this.onPlayerDeath();
+    }
+    return applied;
+  }
+
+  /** 몬스터 처치: EXP + 동전/보석 드랍 (§7.1, §11) */
+  onMonsterKilled(m: Monster): void {
+    if (!this.monsters.includes(m)) return;
+    m.alive = false;
+    this.scene.remove(m.mesh);
+    this.stats.kills += 1;
+    this.sound.play('kill');
+
+    this.progression.addExp(m.exp);
+
+    if (!this.inTutorial) {
+      const [cMin, cMax] = CONFIG.pickups.coinPerKill;
+      const coins = cMin + Math.floor(Math.random() * (cMax - cMin + 1));
+      this.inventory.addCoins(coins);
+      this.hud.floatTextWorld(m.position.clone(), `+${coins} 🪙`, 'coin');
+      if (Math.random() < CONFIG.pickups.gemDropChance) {
+        this.inventory.addGems(1);
+        this.progression.addExp(CONFIG.progression.expReward.gem);
+        this.hud.floatTextWorld(m.position.clone().add(new THREE.Vector3(0, 0.6, 0)), '+1 💎', 'gem');
+      }
+    }
+  }
+
+  removeMonsterMesh(m: Monster): void {
+    this.scene.remove(m.mesh);
+  }
+
+  onPickupCollected(pk: Pickup): void {
+    pk.collected = true;
+    this.scene.remove(pk.mesh);
+    switch (pk.type) {
+      case 'coin':
+        this.inventory.addCoins(1);
+        this.sound.play('coin');
+        break;
+      case 'gem':
+        this.inventory.addGems(1);
+        this.progression.addExp(CONFIG.progression.expReward.gem);
+        this.sound.play('gem');
+        this.hud.floatTextWorld(pk.mesh.position.clone(), '+1 💎', 'gem');
+        break;
+      case 'heal':
+        this.player.heal(CONFIG.pickups.healValue);
+        this.sound.play('heal');
+        this.hud.floatTextWorld(pk.mesh.position.clone(), `+${CONFIG.pickups.healValue} ❤`, 'heal');
+        break;
+    }
+  }
+
+  onPlayerDeath(): void {
+    this.setState('GAMEOVER');
+  }
+
+  onBossDefeated(): void {
+    if (!this.boss) return;
+    this.stats.bossKills += 1;
+    this.progression.addExp(this.boss.def.expReward);
+    this.hud.showBanner(t('misc.victory'), 1.4);
+    this.setState(this.state === 'MIDBOSS' ? 'RUNNING_2' : 'REWARD');
+  }
+
+  onRewardDone(): void {
+    this.setState('RESULT');
+  }
+
+  // ----------------------------------------------------------
+  // 월드 정리 / 분위기
+  // ----------------------------------------------------------
+
+  setMood(mode: 'normal' | 'dark'): void {
+    const theme = this.world.theme;
+    const bg = mode === 'dark' ? theme.bgDark : theme.bg;
+    this.scene.background = new THREE.Color(bg);
+    this.scene.fog = new THREE.Fog(bg, 24, mode === 'dark' ? 55 : 80);
+  }
+
+  private clearEntities(): void {
+    this.monsters.forEach((m) => this.scene.remove(m.mesh));
+    this.obstacles.forEach((o) => this.scene.remove(o.mesh));
+    this.pickups.forEach((pk) => this.scene.remove(pk.mesh));
+    this.projectiles.forEach((p) => this.scene.remove(p.mesh));
+    this.monsters = [];
+    this.obstacles = [];
+    this.pickups = [];
+    this.projectiles = [];
+  }
+
+  private disposeBoss(): void {
+    if (this.boss) {
+      this.boss.dispose();
+      this.boss = null;
+    }
+  }
+
+  private resetRun(): void {
+    this.clearEntities();
+    this.disposeBoss();
+    this.player.resetForRun();
+    this.inventory.reset();
+    this.restorePersistedItems();
+    this.cosmetics.apply(this.player, this.inventory);
+    this.combat.reset();
+    this.stats = { kills: 0, bossKills: 0 };
+    this.distance = 0;
+    this.runElapsed = 0;
+    this.runSpeed = 0;
+    this.segmentStart = 0;
+    this.segmentLength = CONFIG.world.segment1Length;
+    this.checkpoint = null;
+    this.tutorial = null;
+    this.paused = false;
+    this.isNewRecord = false;
+    this.finalScore = 0;
+    this.applyWorldTheme();
+    this.screens.hideTutorialPrompt();
+    this.screens.hideTutorialSkip();
+    this.hud.setShade(0);
+  }
+}

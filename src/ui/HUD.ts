@@ -1,0 +1,279 @@
+// ============================================================
+// 인게임 HUD (§16) — 체력/거리/재화/레벨/스킬 쿨다운/보스 체력바
+// DOM 오버레이 기반 (터치/마우스 공용, 세이프존 고려)
+// ============================================================
+
+import * as THREE from 'three';
+import { t } from '../data/i18n';
+import type { Game } from '../core/Game';
+
+const PHASE_COLORS = ['#22c55e', '#f97316', '#ef4444']; // P1 초록 → P2 주황 → P3 빨강 (§9.4)
+
+export class HUD {
+  private root: HTMLElement;
+  private el: HTMLElement;
+
+  private hpFill!: HTMLElement;
+  private hpText!: HTMLElement;
+  private distEl!: HTMLElement;
+  private scoreEl!: HTMLElement;
+  private coinEl!: HTMLElement;
+  private gemEl!: HTMLElement;
+  private levelEl!: HTMLElement;
+  private expFill!: HTMLElement;
+
+  private bossWrap!: HTMLElement;
+  private bossName!: HTMLElement;
+  private bossFill!: HTMLElement;
+  private bossTrail!: HTMLElement;
+  private bossTicks!: HTMLElement;
+  private bossTrailValue = 1;
+
+  private skillBtns: { el: HTMLElement; cd: HTMLElement; badge: HTMLElement }[] = [];
+  private floaters!: HTMLElement;
+  private vignette!: HTMLElement;
+  private shade!: HTMLElement;
+  private weakPopup!: HTMLElement;
+  private banner!: HTMLElement;
+
+  private projVec = new THREE.Vector3();
+
+  constructor(private game: Game) {
+    this.root = document.getElementById('ui-root')!;
+    this.el = document.createElement('div');
+    this.el.id = 'hud';
+    this.el.hidden = true;
+    this.el.innerHTML = `
+      <div class="hud-top">
+        <div class="hud-left">
+          <div class="hp-bar"><div class="hp-fill"></div><span class="hp-text"></span></div>
+          <div class="currency">🪙 <span class="coin-count">0</span>&nbsp;&nbsp;💎 <span class="gem-count">0</span></div>
+          <div class="level-row">
+            <span class="level-label">Lv.<span class="level-num">1</span></span>
+            <div class="exp-bar"><div class="exp-fill"></div></div>
+          </div>
+        </div>
+        <div class="hud-center">
+          <div class="distance">0m</div>
+          <div class="score">0</div>
+        </div>
+        <button class="pause-btn" aria-label="pause">⏸</button>
+      </div>
+      <div class="boss-wrap" hidden>
+        <div class="boss-name"></div>
+        <div class="boss-bar">
+          <div class="boss-trail"></div>
+          <div class="boss-fill"></div>
+          <div class="boss-ticks"></div>
+        </div>
+      </div>
+      <div class="skills">
+        <button class="skill-btn" data-skill="blast">💥<div class="skill-cd"></div><span class="auto-badge"></span></button>
+        <button class="skill-btn" data-skill="dash">⚡<div class="skill-cd"></div><span class="auto-badge"></span></button>
+      </div>
+      <div class="floaters"></div>
+      <div class="vignette"></div>
+      <div class="scream-shade"></div>
+      <div class="weak-popup" hidden></div>
+      <div class="hud-banner" hidden></div>
+    `;
+    this.root.appendChild(this.el);
+
+    this.hpFill = this.q('.hp-fill');
+    this.hpText = this.q('.hp-text');
+    this.distEl = this.q('.distance');
+    this.scoreEl = this.q('.score');
+    this.coinEl = this.q('.coin-count');
+    this.gemEl = this.q('.gem-count');
+    this.levelEl = this.q('.level-num');
+    this.expFill = this.q('.exp-fill');
+    this.bossWrap = this.q('.boss-wrap');
+    this.bossName = this.q('.boss-name');
+    this.bossFill = this.q('.boss-fill');
+    this.bossTrail = this.q('.boss-trail');
+    this.bossTicks = this.q('.boss-ticks');
+    this.floaters = this.q('.floaters');
+    this.vignette = this.q('.vignette');
+    this.shade = this.q('.scream-shade');
+    this.weakPopup = this.q('.weak-popup');
+    this.banner = this.q('.hud-banner');
+
+    this.q('.pause-btn').addEventListener('click', () => game.togglePause());
+
+    this.el.querySelectorAll<HTMLElement>('.skill-btn').forEach((btn) => {
+      const skill = btn.dataset.skill as 'blast' | 'dash';
+      const handler = (e: Event) => {
+        e.preventDefault();
+        game.combat.useSkill(skill);
+      };
+      btn.addEventListener('click', handler);
+      btn.addEventListener('touchstart', handler, { passive: false });
+      this.skillBtns.push({
+        el: btn,
+        cd: btn.querySelector('.skill-cd')!,
+        badge: btn.querySelector('.auto-badge')!,
+      });
+    });
+  }
+
+  private q(sel: string): HTMLElement {
+    return this.el.querySelector(sel) as HTMLElement;
+  }
+
+  show(): void {
+    this.el.hidden = false;
+  }
+
+  hide(): void {
+    this.el.hidden = true;
+    this.hideBossBar();
+    this.setShade(0);
+    this.weakPopup.hidden = true;
+  }
+
+  // ----------------------------------------------------------
+  // 매 프레임 갱신
+  // ----------------------------------------------------------
+
+  update(dt: number): void {
+    const game = this.game;
+    const p = game.player;
+
+    const hpFrac = Math.max(0, p.hp / p.maxHp);
+    this.hpFill.style.width = `${hpFrac * 100}%`;
+    this.hpFill.style.background = hpFrac > 0.5 ? '#4ade80' : hpFrac > 0.25 ? '#facc15' : '#ef4444';
+    this.hpText.textContent = `❤ ${Math.ceil(p.hp)}/${p.maxHp}`;
+
+    this.distEl.textContent = `🏃 ${Math.floor(game.distance)}${t('misc.meters')}`;
+    this.scoreEl.textContent = `${game.score()}`;
+    this.coinEl.textContent = `${game.inventory.coins}`;
+    this.gemEl.textContent = `${game.inventory.gems}`;
+    this.levelEl.textContent = `${p.level}`;
+    this.expFill.style.width = `${(p.exp / p.expToNext) * 100}%`;
+
+    // 스킬 쿨다운 원형 게이지 + AUTO 배지 (§8.2, §13.1)
+    const ids: ('blast' | 'dash')[] = ['blast', 'dash'];
+    this.skillBtns.forEach((btn, i) => {
+      const id = ids[i];
+      const remain = game.combat.cooldowns[id];
+      const max = game.combat.cooldownMax[id];
+      const frac = remain / max;
+      if (frac > 0) {
+        btn.cd.style.display = 'block';
+        btn.cd.style.background = `conic-gradient(rgba(0,0,0,0.72) ${frac * 360}deg, transparent 0deg)`;
+        btn.el.classList.add('cooling');
+      } else {
+        btn.cd.style.display = 'none';
+        btn.el.classList.remove('cooling');
+      }
+      btn.badge.textContent = t('hud.auto');
+      btn.badge.style.display = game.autoSkill ? 'block' : 'none';
+    });
+
+    // 보스 체력바
+    const boss = game.boss;
+    if (boss && !this.bossWrap.hidden) {
+      const frac = boss.hpFrac;
+      this.bossFill.style.width = `${frac * 100}%`;
+      this.bossFill.style.background = PHASE_COLORS[Math.min(boss.phaseIdx, PHASE_COLORS.length - 1)];
+      // 흰색 잔상 (딜레이 감소 — §9.4)
+      this.bossTrailValue = Math.max(frac, this.bossTrailValue - dt * 0.25);
+      this.bossTrail.style.width = `${this.bossTrailValue * 100}%`;
+
+      // 약점 팝업 — 보스 머리 위 (§9.4)
+      if (boss.staggered) {
+        this.weakPopup.hidden = false;
+        this.weakPopup.textContent = `▼ ${t('boss.weak')} ▼`;
+        const sp = this.project(boss.position.clone().setY(3.4));
+        this.weakPopup.style.left = `${sp.x}px`;
+        this.weakPopup.style.top = `${sp.y}px`;
+      } else {
+        this.weakPopup.hidden = true;
+      }
+    } else {
+      this.weakPopup.hidden = true;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // 보스 바
+  // ----------------------------------------------------------
+
+  showBossBar(nameKey: string, phaseFroms: number[]): void {
+    this.bossWrap.hidden = false;
+    this.bossName.textContent = t(nameKey);
+    this.bossTrailValue = 1;
+    // 페이즈 경계 눈금 (§9.4)
+    this.bossTicks.innerHTML = '';
+    phaseFroms
+      .filter((f) => f < 1)
+      .forEach((f) => {
+        const tick = document.createElement('div');
+        tick.className = 'boss-tick';
+        tick.style.left = `${f * 100}%`;
+        this.bossTicks.appendChild(tick);
+      });
+  }
+
+  hideBossBar(): void {
+    this.bossWrap.hidden = true;
+  }
+
+  // ----------------------------------------------------------
+  // 연출 (플로팅 텍스트 / 플래시 / 셰이드 / 배너)
+  // ----------------------------------------------------------
+
+  private project(pos: THREE.Vector3): { x: number; y: number } {
+    this.projVec.copy(pos).project(this.game.cameraCtl.camera);
+    return {
+      x: (this.projVec.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-this.projVec.y * 0.5 + 0.5) * window.innerHeight,
+    };
+  }
+
+  floatTextWorld(pos: THREE.Vector3, text: string, cls: string): void {
+    if (this.el.hidden) return;
+    const sp = this.project(pos);
+    const div = document.createElement('div');
+    div.className = `floater ${cls}`;
+    div.textContent = text;
+    div.style.left = `${sp.x}px`;
+    div.style.top = `${sp.y}px`;
+    this.floaters.appendChild(div);
+    setTimeout(() => div.remove(), 950);
+  }
+
+  /** 피격 빨강 비네트 */
+  damageFlash(): void {
+    this.vignette.classList.remove('flash');
+    void this.vignette.offsetWidth; // reflow로 애니메이션 재시작
+    this.vignette.classList.add('flash');
+  }
+
+  /** 화면 전체 플래시 (페이즈 전환/레벨업) */
+  flashScreen(color: string, duration: number): void {
+    const div = document.createElement('div');
+    div.className = 'screen-flash';
+    div.style.background = color;
+    div.style.animationDuration = `${duration}s`;
+    this.el.appendChild(div);
+    setTimeout(() => div.remove(), duration * 1000 + 60);
+  }
+
+  /** 비명 가장자리 어둡게 (§9.4) */
+  setShade(opacity: number): void {
+    this.shade.style.opacity = `${opacity}`;
+  }
+
+  /** 중앙 배너 (보스 등장 등) */
+  showBanner(text: string, duration = 1.6): void {
+    this.banner.textContent = text;
+    this.banner.hidden = false;
+    this.banner.classList.remove('pop');
+    void this.banner.offsetWidth;
+    this.banner.classList.add('pop');
+    setTimeout(() => {
+      this.banner.hidden = true;
+    }, duration * 1000);
+  }
+}

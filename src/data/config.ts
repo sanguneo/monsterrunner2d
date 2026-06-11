@@ -1,0 +1,129 @@
+// ============================================================
+// 밸런스 수치 단일 소스 (최종기획및설계서 §20)
+// 모든 밸런스 조정은 이 파일에서만 한다.
+// ============================================================
+
+export type PatternId =
+  | 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
+  | 'P6' | 'P7' | 'P8' | 'P9' | 'P10';
+
+export interface BossPhaseConfig {
+  from: number;
+  queue: string[];
+  gap: number;
+  mods?: Record<string, number>;
+}
+
+export const CONFIG = {
+  lanes: { count: 3, spacing: 2.0, moveTime: 0.12, startIndex: 1 },
+
+  run: {
+    speedStart: 12,
+    speedMax: 24,
+    accel: 0.5,
+    jumpAirTime: 0.7,
+    gravity: -25,
+    slideDuration: 0.6,
+    hitInvuln: 0.5,
+  },
+
+  world: {
+    spawnAhead: 45,
+    despawnBehind: 14,
+    segment1Length: 650,
+    segment2Length: 850,
+    monsterSpawnIntervalStart: 4.0,
+    monsterSpawnIntervalEnd: 2.0,
+    arenaBossDistance: 12,
+    tutorialSpeed: 7,
+  },
+
+  player: {
+    baseHp: 100,
+    hpPerLevel: 10,
+    baseAttack: 10,
+    attackPerLevel: 2,
+    baseCrit: 0.05,
+    critPerLevel: 0.01,
+    critMult: 2.0,
+    fireInterval: 0.4, // 성장 비대상(고정), '연사 폭주'만 일시 단축
+    fireRange: 18,
+    moveBonusPerLevel: 0.02,
+    jumpBonusPerLevel: 0.03,
+  },
+
+  projectiles: { playerSpeed: 40, playerLife: 1.2 },
+
+  progression: {
+    expCurve: (level: number) => 50 * level,
+    // 몬스터/보스 처치 EXP는 data/worlds.ts의 각 정의에 포함
+    expReward: { gem: 10 },
+    levelUp: 'auto' as const,
+  },
+
+  skills: {
+    slot1: { id: 'blast' as const, dmgMult: 4, range: 14, cooldown: 8, equipped: true },
+    slot2: { id: 'dash' as const, duration: 1.5, speedBonus: 0.5, cooldown: 12, equipped: true },
+    pool: {
+      rapidFire: { fireMult: 0.5, duration: 5, cooldown: 14 }, // 해금 예정(로직만)
+      healPulse: { heal: 40, cooldown: 20 }, // 해금 예정(로직만)
+    },
+    autoDashIdleDelay: 3.0, // 자동 모드: 위협 미감지 시 준비 후 이 시간 지나면 발동
+    autoDashLookAhead: 0.45, // 자동 대시 위협 감지 예측 시간(초)
+  },
+
+  obstacles: {
+    damage: { LOW: 15, HIGH: 15, PIT: 30, BLOCK: 15 },
+    minRecovery: 0.8,
+    ramp: [
+      { until: 0.3, pool: ['P1', 'P2', 'P3', 'P9'] as PatternId[], interval: 2.5 },
+      { until: 0.7, pool: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P9'] as PatternId[], interval: 1.8 },
+      { until: 1.0, pool: ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'] as PatternId[], interval: 1.2 },
+    ],
+    maxConcurrentThreats: 4,
+  },
+
+  pickups: {
+    coinPerKill: [1, 3] as [number, number],
+    gemDropChance: 0.2,
+    healValue: 30,
+    healPerSegment: [1, 2] as [number, number],
+    gemPatternChance: 0.15,
+    coinLineChance: 0.3,
+  },
+
+  // 보스 정의는 data/worlds.ts (월드별 중간/최종보스 — 패턴·페이즈·외형)
+  phaseTransition: { invuln: 0.5 },
+
+  score: { perMeter: 1, perCoin: 5, perGem: 20, perKill: 30, perBoss: 500 },
+
+  accessibility: {
+    autoSkill: true,
+    inputBuffer: 0.15,
+    coyoteTime: 0.12,
+    hitboxScale: 0.8, // 플레이어 피격 판정에만 적용(자동 사격 명중 판정은 정상 크기)
+    actionInputQueue: 1,
+  },
+
+  tutorial: {
+    enabled: true,
+    steps: ['run', 'lane', 'jump', 'slide', 'autofire', 'skill'] as const,
+    noDamage: true,
+    waitForSuccess: true,
+    skippable: true,
+    seenFlagKey: 'mhr_tutorial_seen',
+  },
+
+  storage: {
+    highScoreKey: 'mhr_highscore',
+    worldUnlockKey: 'mhr_world_unlocked', // 해금된 최대 월드 인덱스
+    itemsKey: 'mhr_items', // 획득한 보상 장비 목록
+  },
+  i18n: { defaultLocale: 'ko' as const, locales: ['ko', 'en'] as const },
+};
+
+// 카메라가 플레이어 뒤(-Z)에서 +Z를 바라보므로 월드 +X가 화면 왼쪽에 보인다.
+// 레인 0(좌)이 화면 왼쪽에 오도록 +X에 매핑한다.
+export function laneX(lane: number): number {
+  return (1 - lane) * CONFIG.lanes.spacing;
+}
