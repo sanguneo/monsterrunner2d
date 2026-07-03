@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { CONFIG, laneX } from '../data/config';
 import { t } from '../data/i18n';
 import { Projectile } from '../entities/Projectile';
-import type { Monster } from '../entities/Monster';
+
 import type { Game } from '../core/Game';
 
 export type SkillId = 'blast' | 'dash' | 'rapidFire' | 'healPulse';
@@ -41,7 +41,10 @@ export class Combat {
     this.fireTimer = 0;
     this.rapidActive = 0;
     this.dashReadyIdle = 0;
-    this.fx.forEach((f) => this.game.scene.remove(f.mesh));
+    this.fx.forEach((f) => {
+      this.game.scene.remove(f.mesh);
+      (f.mesh.material as THREE.Material).dispose(); // clone된 링 머티리얼 해제
+    });
     this.fx = [];
   }
 
@@ -58,6 +61,8 @@ export class Combat {
     if (game.skillsEnabled) {
       if (game.input.consume('skill1', 0.3)) this.useSkill('blast');
       if (game.input.consume('skill2', 0.3)) this.useSkill('dash');
+      if (game.input.consume('skill3', 0.3)) this.useSkill('rapidFire');
+      if (game.input.consume('skill4', 0.3)) this.useSkill('healPulse');
     }
 
     // 자동 스킬 발동 (§13.1, 기본 ON)
@@ -143,7 +148,7 @@ export class Combat {
         // 몬스터 명중 (정상 크기 판정 — §7.1)
         for (const m of game.monsters) {
           if (!m.alive) continue;
-          if (proj.position.distanceTo(m.position) < 0.75) {
+          if (proj.position.distanceTo(m.position) < CONFIG.combat.monsterHitRadius) {
             proj.alive = false;
             game.hud.floatTextWorld(m.position.clone(), `${Math.round(proj.damage)}`, proj.isCrit ? 'crit' : 'dmg');
             game.sound.play('hitMonster');
@@ -154,7 +159,7 @@ export class Combat {
         // 보스 명중
         if (proj.alive && game.boss && game.boss.targetable) {
           const bossCenter = game.boss.position.clone().setY(1.5);
-          if (proj.position.distanceTo(bossCenter) < 1.4) {
+          if (proj.position.distanceTo(bossCenter) < CONFIG.combat.bossHitRadius) {
             proj.alive = false;
             const dealt = game.boss.takeDamage(proj.damage);
             if (dealt > 0) {
@@ -167,8 +172,8 @@ export class Combat {
       } else if (proj.alive && proj.owner === 'enemy') {
         // 적 투사체(분필) vs 플레이어 — 피격 히트박스 80% (§13.2)
         if (
-          Math.abs(proj.position.x - p.x) < 0.8 * scale + 0.15 &&
-          Math.abs(proj.position.z - p.z) < 0.7 &&
+          Math.abs(proj.position.x - p.x) < CONFIG.combat.enemyProjHalfX * scale + 0.15 &&
+          Math.abs(proj.position.z - p.z) < CONFIG.combat.enemyProjHalfZ &&
           p.y < 2.4
         ) {
           proj.alive = false;
@@ -196,7 +201,11 @@ export class Combat {
     // 몬스터 접촉
     for (const m of game.monsters) {
       if (!m.alive) continue;
-      if (Math.abs(m.x - p.x) < 0.9 * scale && Math.abs(m.z - p.z) < 0.9 && p.y < 1.4) {
+      if (
+        Math.abs(m.x - p.x) < CONFIG.combat.monsterContact * scale &&
+        Math.abs(m.z - p.z) < CONFIG.combat.monsterContact &&
+        p.y < 1.4
+      ) {
         if (p.dashTimer > 0) continue; // 무적 대시: 관통
         if (game.damagePlayer(m.contactDamage)) {
           m.alive = false; // 접촉한 몬스터는 소멸 (EXP 없음)
@@ -218,7 +227,11 @@ export class Combat {
     // 수집물 획득 (관대한 판정)
     for (const pk of game.pickups) {
       if (!pk.alive) continue;
-      if (Math.abs(pk.x - p.x) < 1.0 && Math.abs(pk.z - p.z) < 1.0 && Math.abs(pk.y - (p.y + 0.8)) < 1.3) {
+      if (
+        Math.abs(pk.x - p.x) < CONFIG.combat.pickupRadius &&
+        Math.abs(pk.z - p.z) < CONFIG.combat.pickupRadius &&
+        Math.abs(pk.y - (p.y + 0.8)) < 1.3
+      ) {
         pk.alive = false;
         game.onPickupCollected(pk);
       }
@@ -230,7 +243,7 @@ export class Combat {
   // ----------------------------------------------------------
 
   useSkill(id: SkillId): boolean {
-    if (this.cooldowns[id] > 0 || !this.game.skillsEnabled) return false;
+    if (this.cooldowns[id] > 0 || !this.game.skillsEnabled || !this.game.skillUnlocked(id)) return false;
     switch (id) {
       case 'blast':
         return this.castBlast();
@@ -263,7 +276,11 @@ export class Combat {
       const dealt = game.boss.takeDamage(damage);
       if (dealt > 0) {
         hitAny = true;
-        game.hud.floatTextWorld(game.boss.position.clone().setY(2), `${dealt}`, game.boss.staggered ? 'dmg-weak' : 'crit');
+        game.hud.floatTextWorld(
+          game.boss.position.clone().setY(2),
+          `${dealt}`,
+          game.boss.staggered ? 'dmg-weak' : 'crit',
+        );
       }
     }
 
@@ -313,13 +330,25 @@ export class Combat {
     const game = this.game;
     const p = game.player;
 
-    // 광역 폭발: 전방 사정거리 내 몬스터/보스 있을 때 자동 (헛방 방지)
-    if (this.cooldowns.blast <= 0) {
-      const range = CONFIG.skills.slot1.range;
-      const enemyNear =
-        game.monsters.some((m) => m.alive && m.z > p.z - 1 && m.z < p.z + range) ||
-        (game.boss !== null && game.boss.targetable && game.boss.z - p.z < range + 4);
-      if (enemyNear) this.useSkill('blast');
+    // 광역 폭발 / 연사 폭주: 전방 사정거리 내 몬스터/보스 있을 때 자동 (헛방 방지)
+    const range = CONFIG.skills.slot1.range;
+    const enemyNear =
+      game.monsters.some((m) => m.alive && m.z > p.z - 1 && m.z < p.z + range) ||
+      (game.boss !== null && game.boss.targetable && game.boss.z - p.z < range + 4);
+
+    if (this.cooldowns.blast <= 0 && enemyNear) this.useSkill('blast');
+
+    // 연사 폭주: 해금 시 전방에 적이 있고 아직 버프가 없을 때 자동 (§8.1)
+    if (game.skillUnlocked('rapidFire') && this.cooldowns.rapidFire <= 0 && this.rapidActive <= 0 && enemyNear) {
+      this.useSkill('rapidFire');
+    }
+
+    // 회복 파동: 해금 시 체력이 임계 이하이고 회복이 낭비되지 않을 때 자동 (§8.1)
+    if (game.skillUnlocked('healPulse') && this.cooldowns.healPulse <= 0) {
+      const healAmt = CONFIG.skills.pool.healPulse.heal;
+      if (p.hp / p.maxHp <= CONFIG.skills.autoHealHpFrac && p.maxHp - p.hp >= healAmt * 0.8) {
+        this.useSkill('healPulse');
+      }
     }
 
     // 무적 대시: 회피 불가 위협 감지 시 우선 발동, 없으면 쿨마다 (대기 후)
@@ -334,6 +363,26 @@ export class Combat {
       }
     } else {
       this.dashReadyIdle = 0;
+    }
+
+    this.autoJumpPit();
+  }
+
+  /**
+   * 자동 점프 보조 — 전방 PIT(구덩이, 데미지 30·점프만 회피)를 자동 점프로 넘긴다.
+   * 대시가 쿨일 때도 무료로 회피 가능. 어린이 방치 플레이 안전망 (검토의견 §4).
+   */
+  private autoJumpPit(): void {
+    const p = this.game.player;
+    if (p.airborne || p.dashTimer > 0) return;
+    const lookAhead = Math.max(this.game.runSpeed, 8) * CONFIG.skills.autoDashLookAhead;
+    for (const o of this.game.obstacles) {
+      if (!o.alive || o.hitDone || o.type !== 'PIT' || o.lane !== p.lane) continue;
+      const d = o.z - p.z;
+      if (d > 0.3 && d < lookAhead) {
+        p.tryAction('jump');
+        return;
+      }
     }
   }
 
@@ -382,6 +431,7 @@ export class Combat {
       (f.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, f.life / 0.45);
       if (f.life <= 0) {
         this.game.scene.remove(f.mesh);
+        (f.mesh.material as THREE.Material).dispose(); // clone된 링 머티리얼 해제
         this.fx.splice(i, 1);
       }
     }

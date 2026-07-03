@@ -5,7 +5,7 @@
 
 import { CONFIG } from '../data/config';
 
-export type Action = 'left' | 'right' | 'jump' | 'slide' | 'skill1' | 'skill2' | 'pause';
+export type Action = 'left' | 'right' | 'jump' | 'slide' | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'pause';
 
 interface BufferedAction {
   action: Action;
@@ -95,6 +95,12 @@ export class Input {
         break;
       case 'KeyE':
         this.push('skill2');
+        break;
+      case 'KeyR':
+        this.push('skill3');
+        break;
+      case 'KeyF':
+        this.push('skill4');
         break;
       case 'Escape':
       case 'KeyP':

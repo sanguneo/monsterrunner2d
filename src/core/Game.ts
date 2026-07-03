@@ -10,11 +10,13 @@ import { t } from '../data/i18n';
 import { Input } from './Input';
 import { CameraController } from './Camera';
 import { Tutorial } from './Tutorial';
+import { Environment } from './Environment';
+import { computeScore, skillUnlocked, newlyUnlockedSkillKey } from './rules';
 import { Player } from '../entities/Player';
 import { Monster } from '../entities/Monster';
 import { Boss } from '../entities/Boss';
 import { WORLDS, REWARD_ITEMS } from '../data/worlds';
-import type { WorldDef, WorldTheme, MonsterDef } from '../data/worlds';
+import type { WorldDef, MonsterDef } from '../data/worlds';
 import { Obstacle, applyObstacleTheme } from '../entities/Obstacle';
 import type { ObstacleType } from '../entities/Obstacle';
 import { Pickup } from '../entities/Pickup';
@@ -22,23 +24,18 @@ import type { PickupType } from '../entities/Pickup';
 import { Projectile } from '../entities/Projectile';
 import { Spawner } from '../systems/Spawner';
 import { Combat } from '../systems/Combat';
+import type { SkillId } from '../systems/Combat';
 import { Progression } from '../systems/Progression';
 import { Inventory } from '../systems/Inventory';
 import { Cosmetics } from '../systems/Cosmetics';
 import { SoundManager } from '../systems/Sound';
+import type { SoundId } from '../systems/Sound';
 import { HUD } from '../ui/HUD';
 import { Screens } from '../ui/Screens';
+import { uiIcon } from '../ui/icons';
 
 export type GameStateName =
-  | 'TITLE'
-  | 'TUTORIAL'
-  | 'RUNNING_1'
-  | 'MIDBOSS'
-  | 'RUNNING_2'
-  | 'FINALBOSS'
-  | 'REWARD'
-  | 'RESULT'
-  | 'GAMEOVER';
+  'TITLE' | 'TUTORIAL' | 'RUNNING_1' | 'MIDBOSS' | 'RUNNING_2' | 'FINALBOSS' | 'REWARD' | 'RESULT' | 'GAMEOVER';
 
 interface Checkpoint {
   state: 'MIDBOSS' | 'FINALBOSS';
@@ -56,74 +53,6 @@ interface Checkpoint {
   stats: { kills: number; bossKills: number };
   distance: number;
   runElapsed: number;
-}
-
-// ------------------------------------------------------------
-// 환경(복도 배경) — 바닥/레인 점선/측벽 재활용 스크롤
-// ------------------------------------------------------------
-
-class Environment {
-  private floor: THREE.Mesh;
-  private dashes: THREE.Mesh[] = [];
-  private walls: THREE.Mesh[] = [];
-  private readonly dashSpan = 180;
-  private readonly wallSpan = 192;
-  private floorMat: THREE.MeshStandardMaterial;
-  private wallMatA: THREE.MeshStandardMaterial;
-  private wallMatB: THREE.MeshStandardMaterial;
-
-  constructor(scene: THREE.Scene) {
-    const floorGeo = new THREE.PlaneGeometry(10, 240);
-    this.floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3f63 });
-    this.floor = new THREE.Mesh(floorGeo, this.floorMat);
-    this.floor.rotation.x = -Math.PI / 2;
-    this.floor.position.y = -0.01;
-    scene.add(this.floor);
-
-    // 레인 경계 점선
-    const dashGeo = new THREE.BoxGeometry(0.12, 0.02, 2.2);
-    const dashMat = new THREE.MeshBasicMaterial({ color: 0xbcb3d8 });
-    for (let side = 0; side < 2; side++) {
-      const x = side === 0 ? -CONFIG.lanes.spacing / 2 : CONFIG.lanes.spacing / 2;
-      for (let i = 0; i < 30; i++) {
-        const d = new THREE.Mesh(dashGeo, dashMat);
-        d.position.set(x, 0.01, i * 6);
-        scene.add(d);
-        this.dashes.push(d);
-      }
-    }
-
-    // 측벽 (월드 테마별 교차 톤)
-    const wallGeo = new THREE.BoxGeometry(0.6, 5, 11);
-    this.wallMatA = new THREE.MeshStandardMaterial({ color: 0x37304f });
-    this.wallMatB = new THREE.MeshStandardMaterial({ color: 0x2a2440 });
-    for (let side = 0; side < 2; side++) {
-      const x = side === 0 ? -5.2 : 5.2;
-      for (let i = 0; i < 16; i++) {
-        const w = new THREE.Mesh(wallGeo, i % 2 === 0 ? this.wallMatA : this.wallMatB);
-        w.position.set(x, 2.5, i * 12);
-        scene.add(w);
-        this.walls.push(w);
-      }
-    }
-  }
-
-  /** 월드 테마 색상 적용 */
-  setTheme(theme: WorldTheme): void {
-    this.floorMat.color.setHex(theme.floor);
-    this.wallMatA.color.setHex(theme.wallA);
-    this.wallMatB.color.setHex(theme.wallB);
-  }
-
-  update(playerZ: number): void {
-    this.floor.position.z = playerZ + 80;
-    for (const d of this.dashes) {
-      if (d.position.z < playerZ - 20) d.position.z += this.dashSpan;
-    }
-    for (const w of this.walls) {
-      if (w.position.z < playerZ - 24) w.position.z += this.wallSpan;
-    }
-  }
 }
 
 // ------------------------------------------------------------
@@ -172,6 +101,7 @@ export class Game {
   private readonly STEP = 1 / 60;
   private finalScore = 0;
   private isNewRecord = false;
+  private currentBgm: SoundId | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -193,6 +123,7 @@ export class Game {
     this.scene.add(this.player.group);
 
     this.sound = new SoundManager();
+    this.player.sfx = (id) => this.sound.play(id); // 점프/슬라이드/레인이동 효과음 배선
     this.inventory = new Inventory();
     this.cosmetics = new Cosmetics();
     this.progression = new Progression(this);
@@ -210,6 +141,11 @@ export class Game {
     window.addEventListener('resize', () => {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.cameraCtl.resize(window.innerWidth / window.innerHeight);
+    });
+
+    // 백그라운드 전환 시 자동 일시정지 — rAF 스로틀로 인한 슬로모션 진행 방지
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.isPlayState && !this.paused) this.togglePause();
     });
 
     this.setState('TITLE');
@@ -285,6 +221,7 @@ export class Game {
     if (idx <= this.unlockedWorldIdx()) {
       this.worldIdx = idx;
       this.applyWorldTheme();
+      this.screens.preloadWorld(idx); // 선택 월드 인트로/보상 이미지 지연 로드
       this.screens.showTitle();
     }
   }
@@ -322,18 +259,35 @@ export class Game {
   }
 
   score(): number {
-    const s = CONFIG.score;
-    return Math.floor(
-      this.distance * s.perMeter +
-        this.inventory.coins * s.perCoin +
-        this.inventory.gems * s.perGem +
-        this.stats.kills * s.perKill +
-        this.stats.bossKills * s.perBoss,
+    return computeScore(
+      {
+        distance: this.distance,
+        coins: this.inventory.coins,
+        gems: this.inventory.gems,
+        kills: this.stats.kills,
+        bossKills: this.stats.bossKills,
+      },
+      CONFIG.score,
     );
   }
 
-  loadHighScore(): number {
-    const v = localStorage.getItem(CONFIG.storage.highScoreKey);
+  private highScoreKey(idx: number): string {
+    return `${CONFIG.storage.highScorePrefix}${WORLDS[idx].id}`;
+  }
+
+  /** 구버전 글로벌 최고점수를 1월드(school) 기록으로 1회 이관 후 구 키 제거 */
+  private migrateLegacyHighScore(): void {
+    const legacy = localStorage.getItem(CONFIG.storage.legacyHighScoreKey);
+    if (legacy === null) return;
+    if (localStorage.getItem(this.highScoreKey(0)) === null) {
+      localStorage.setItem(this.highScoreKey(0), legacy);
+    }
+    localStorage.removeItem(CONFIG.storage.legacyHighScoreKey);
+  }
+
+  loadHighScore(worldIdx: number = this.worldIdx): number {
+    this.migrateLegacyHighScore();
+    const v = localStorage.getItem(this.highScoreKey(worldIdx));
     return v ? parseInt(v, 10) || 0 : 0;
   }
 
@@ -342,8 +296,13 @@ export class Game {
     const high = this.loadHighScore();
     this.isNewRecord = this.finalScore > high;
     if (this.isNewRecord) {
-      localStorage.setItem(CONFIG.storage.highScoreKey, `${this.finalScore}`);
+      localStorage.setItem(this.highScoreKey(this.worldIdx), `${this.finalScore}`);
     }
+  }
+
+  /** 스킬 해금 여부 — unlocks에 없는 스킬(blast/dash)은 항상 사용 가능 */
+  skillUnlocked(id: SkillId): boolean {
+    return skillUnlocked(CONFIG.skills.unlocks, id, this.unlockedWorldIdx());
   }
 
   // ----------------------------------------------------------
@@ -380,10 +339,7 @@ export class Game {
           break;
         }
         this.runElapsed += dt;
-        const base = Math.min(
-          CONFIG.run.speedStart + CONFIG.run.accel * this.runElapsed,
-          CONFIG.run.speedMax,
-        );
+        const base = Math.min(CONFIG.run.speedStart + CONFIG.run.accel * this.runElapsed, CONFIG.run.speedMax);
         const dashMult = this.player.dashTimer > 0 ? 1 + CONFIG.skills.slot2.speedBonus : 1;
         this.runSpeed = base * this.player.speedMult * dashMult;
         this.player.z += this.runSpeed * dt;
@@ -465,6 +421,7 @@ export class Game {
         this.hud.hide();
         this.screens.showTitle();
         this.cameraCtl.mode = 'title';
+        this.setBgm(null);
         break;
 
       case 'TUTORIAL':
@@ -473,6 +430,7 @@ export class Game {
         this.cameraCtl.mode = 'follow';
         this.tutorial = new Tutorial(this);
         this.tutorial.start();
+        this.setBgm('bgmRun');
         break;
 
       case 'RUNNING_1':
@@ -486,8 +444,9 @@ export class Game {
         this.segmentLength = CONFIG.world.segment1Length;
         this.spawner.reset();
         // 스테이지 표시 이미지 먼저 노출 후 출발
-        this.stageIntroTimer = 3.0;
+        this.stageIntroTimer = CONFIG.world.stageIntroDuration;
         this.screens.showStageIntro(this.worldIdx);
+        this.setBgm('bgmRun');
         break;
 
       case 'RUNNING_2':
@@ -498,6 +457,7 @@ export class Game {
         this.segmentStart = this.distance;
         this.segmentLength = CONFIG.world.segment2Length;
         this.spawner.reset();
+        this.setBgm('bgmRun');
         this.sound.play('checkpoint');
         break;
 
@@ -516,25 +476,37 @@ export class Game {
         this.hud.showBanner(`${t('boss.incoming')} ${t(def.nameKey)}`);
         this.cameraCtl.mode = 'boss';
         this.sound.play('bossIntro');
+        this.setBgm('bgmBoss');
         break;
       }
 
       case 'REWARD': {
         this.disposeBoss();
-        this.hud.hideBossBar();
+        this.hud.hide(); // 보상 연출 뒤 HUD(체력·스킬·일시정지) 숨김
         // 월드 클리어 보상 장비 지급 → 외형 변화 (§12, §15.2)
         const item = REWARD_ITEMS[this.world.reward];
         this.inventory.grantItem(this.world.reward, item.slot);
         this.persistItem(this.world.reward);
         this.cosmetics.apply(this.player, this.inventory);
+        // 이번 클리어로 새로 해금되는 스킬 검출 (해금 반영 전후 비교)
+        const before = this.unlockedWorldIdx();
         this.unlockWorld(this.worldIdx + 1);
-        this.screens.showReward({ itemId: this.world.reward, emoji: item.emoji, nameKey: item.nameKey });
+        const after = this.unlockedWorldIdx();
+        const unlockedSkillKey = newlyUnlockedSkillKey(CONFIG.skills.unlocks, before, after);
+        this.screens.showReward({
+          itemId: this.world.reward,
+          emoji: item.emoji,
+          nameKey: item.nameKey,
+          unlockedSkillKey,
+        });
         this.sound.play('victory');
+        this.setBgm(null);
         break;
       }
 
       case 'RESULT':
         this.saveHighScore();
+        this.setBgm(null);
         this.hud.hide();
         this.screens.showResult({
           level: this.player.level,
@@ -552,6 +524,7 @@ export class Game {
 
       case 'GAMEOVER':
         this.saveHighScore();
+        this.setBgm(null);
         this.hud.hide();
         this.hud.setShade(0);
         this.screens.showGameOver({
@@ -617,7 +590,38 @@ export class Game {
     this.stageIntroTimer = 0;
     this.screens.hideStageIntro();
     this.input.clear();
-    this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
+    // 새로 해금된 스킬이 있으면 그 안내를 우선, 없으면 월드 배너
+    if (!this.announceUnlockedSkills()) {
+      this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
+    }
+  }
+
+  /** 해금됐지만 아직 인게임 배너로 안내 안 한 스킬을 1개 안내 (§8 발견성). @returns 안내했으면 true */
+  private announceUnlockedSkills(): boolean {
+    const info: Record<string, { key: string; nameKey: string }> = {
+      rapidFire: { key: 'R', nameKey: 'skill.rapidFire' },
+      healPulse: { key: 'F', nameKey: 'skill.healPulse' },
+    };
+    const announced = this.loadAnnouncedSkills();
+    for (const id of Object.keys(info)) {
+      if (this.skillUnlocked(id as SkillId) && !announced.includes(id)) {
+        const s = info[id];
+        this.hud.showBanner(`${t('banner.newSkill')} ${t(s.nameKey)} (${s.key})`, 2.6);
+        announced.push(id);
+        localStorage.setItem(CONFIG.storage.skillAnnouncedKey, JSON.stringify(announced));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private loadAnnouncedSkills(): string[] {
+    try {
+      const v = localStorage.getItem(CONFIG.storage.skillAnnouncedKey);
+      return v ? (JSON.parse(v) as string[]) : [];
+    } catch {
+      return [];
+    }
   }
 
   setAutoSkill(on: boolean): void {
@@ -751,11 +755,11 @@ export class Game {
       const [cMin, cMax] = CONFIG.pickups.coinPerKill;
       const coins = cMin + Math.floor(Math.random() * (cMax - cMin + 1));
       this.inventory.addCoins(coins);
-      this.hud.floatTextWorld(m.position.clone(), `+${coins} 🪙`, 'coin');
+      this.hud.floatTextWorld(m.position.clone(), `${uiIcon('coin')} +${coins}`, 'coin');
       if (Math.random() < CONFIG.pickups.gemDropChance) {
         this.inventory.addGems(1);
         this.progression.addExp(CONFIG.progression.expReward.gem);
-        this.hud.floatTextWorld(m.position.clone().add(new THREE.Vector3(0, 0.6, 0)), '+1 💎', 'gem');
+        this.hud.floatTextWorld(m.position.clone().add(new THREE.Vector3(0, 0.6, 0)), `${uiIcon('gem')} +1`, 'gem');
       }
     }
   }
@@ -776,12 +780,12 @@ export class Game {
         this.inventory.addGems(1);
         this.progression.addExp(CONFIG.progression.expReward.gem);
         this.sound.play('gem');
-        this.hud.floatTextWorld(pk.mesh.position.clone(), '+1 💎', 'gem');
+        this.hud.floatTextWorld(pk.mesh.position.clone(), `${uiIcon('gem')} +1`, 'gem');
         break;
       case 'heal':
         this.player.heal(CONFIG.pickups.healValue);
         this.sound.play('heal');
-        this.hud.floatTextWorld(pk.mesh.position.clone(), `+${CONFIG.pickups.healValue} ❤`, 'heal');
+        this.hud.floatTextWorld(pk.mesh.position.clone(), `${uiIcon('heart')} +${CONFIG.pickups.healValue}`, 'heal');
         break;
     }
   }
@@ -811,6 +815,14 @@ export class Game {
     const bg = mode === 'dark' ? theme.bgDark : theme.bg;
     this.scene.background = new THREE.Color(bg);
     this.scene.fog = new THREE.Fog(bg, 24, mode === 'dark' ? 55 : 80);
+  }
+
+  /** BGM 전환 — 동시 1개. 같은 트랙이면 무시(중복 재생 방지). null이면 정지. */
+  private setBgm(id: SoundId | null): void {
+    if (this.currentBgm === id) return;
+    if (this.currentBgm) this.sound.stop(this.currentBgm);
+    this.currentBgm = id;
+    if (id) this.sound.play(id, { loop: true });
   }
 
   private clearEntities(): void {

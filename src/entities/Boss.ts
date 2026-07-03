@@ -11,18 +11,10 @@ import { CONFIG, laneX } from '../data/config';
 import type { BossPhaseConfig } from '../data/config';
 import type { BossDef, BossPartDef, PatternDef } from '../data/worlds';
 import type { Game } from '../core/Game';
+import { pickThreatLanes } from '../core/rules';
 
 type BossState =
-  | 'intro'
-  | 'gap'
-  | 'telegraph'
-  | 'active'
-  | 'recovery'
-  | 'stagger'
-  | 'vanish'
-  | 'reappear'
-  | 'phasechange'
-  | 'dead';
+  'intro' | 'gap' | 'telegraph' | 'active' | 'recovery' | 'stagger' | 'vanish' | 'reappear' | 'phasechange' | 'dead';
 
 interface BlockWall {
   mesh: THREE.Mesh;
@@ -30,6 +22,7 @@ interface BlockWall {
   timer: number;
   duration: number;
   damage: number;
+  hitDone: boolean; // 벽당 1회 피해 (BLOCK 장애물과 동일 — 무한 드레인 방지)
 }
 
 const markerGeo = new THREE.PlaneGeometry(1.8, 10);
@@ -45,6 +38,14 @@ function wallMaterial(color: number): THREE.MeshStandardMaterial {
     wallMatCache.set(color, m);
   }
   return m;
+}
+
+/** 메시의 GPU 리소스 해제. sharedGeo=true면 지오메트리는 공유본이므로 건드리지 않는다. */
+function disposeMesh(mesh: THREE.Mesh, sharedGeo = false): void {
+  if (!sharedGeo) mesh.geometry.dispose();
+  const mat = mesh.material;
+  if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+  else mat.dispose();
 }
 
 export class Boss {
@@ -498,14 +499,7 @@ export class Boss {
 
   /** 플레이어 레인 포함 n개 레인 선택 — 항상 안전 레인 1개 이상 보장 */
   private pickLanes(playerLane: number, n: number): number[] {
-    const count = Math.min(n, CONFIG.lanes.count - 1);
-    const lanes = [playerLane];
-    const others = [0, 1, 2].filter((l) => l !== playerLane);
-    while (lanes.length < count && others.length > 0) {
-      const i = Math.floor(Math.random() * others.length);
-      lanes.push(others.splice(i, 1)[0]);
-    }
-    return lanes;
+    return pickThreatLanes(playerLane, n, CONFIG.lanes.count);
   }
 
   private beginActive(): void {
@@ -587,7 +581,7 @@ export class Boss {
       case 'walls':
         for (const lane of this.targetLanes) {
           const mesh = new THREE.Mesh(wallGeo, wallMaterial(def.color ?? 0x1c1022));
-          mesh.position.set(laneX(lane), 1.6, player.z + 1.5);
+          mesh.position.set(laneX(lane), 1.6, player.z + 0.5);
           this.game.scene.add(mesh);
           this.blockWalls.push({
             mesh,
@@ -595,6 +589,7 @@ export class Boss {
             timer: def.blockDuration ?? 2.0,
             duration: def.blockDuration ?? 2.0,
             damage: def.damage ?? 20,
+            hitDone: false,
           });
         }
         this.state = 'recovery';
@@ -630,6 +625,7 @@ export class Boss {
         }
         if (this.wave.position.z < player.z - 6) {
           this.game.scene.remove(this.wave);
+          disposeMesh(this.wave, true);
           this.wave = null;
           // 파동 후 경직 ★ — 주 딜 타이밍
           this.enterStagger((def.stagger ?? 1.2) * this.getMod('staggerMult', 1));
@@ -640,6 +636,7 @@ export class Boss {
       if (this.timer <= 0) {
         if (this.wave) {
           this.game.scene.remove(this.wave);
+          disposeMesh(this.wave, true);
           this.wave = null;
         }
         this.enterStagger((def.stagger ?? 1.2) * this.getMod('staggerMult', 1));
@@ -657,6 +654,7 @@ export class Boss {
       }
     } else if (def.type === 'barrage') {
       // 순차 난사
+      this.timer -= dt; // 안전 상한 카운트다운
       this.barrageTimer -= dt;
       if (this.barrageTimer <= 0 && this.barrageLeft > 0) {
         const lane = this.barrageLanes[this.barrageLanes.length - this.barrageLeft];
@@ -668,15 +666,11 @@ export class Boss {
         this.barrageLeft -= 1;
         this.barrageTimer = def.interval ?? 0.3;
       }
-      if (this.barrageLeft <= 0 && this.barrageTimer <= 0) {
+      // 종료 판정은 단일 경로 — 모든 탄 발사 완료 또는 안전 상한 도달
+      if ((this.barrageLeft <= 0 && this.barrageTimer <= 0) || this.timer <= 0) {
         this.clearMarkers();
         this.state = 'recovery';
         this.timer = def.recovery ?? 0.5;
-      }
-      this.timer -= dt;
-      if (this.timer <= 0) {
-        this.clearMarkers();
-        this.afterPattern();
       }
     } else if (def.type === 'chase') {
       // 락 종료 → 강타
@@ -746,12 +740,10 @@ export class Boss {
       const grow = Math.min(1, (w.duration - w.timer) * 6);
       const shrink = Math.min(1, w.timer * 4);
       w.mesh.scale.y = Math.max(0.05, Math.min(grow, shrink));
-      if (
-        w.timer > 0.1 &&
-        Math.abs(player.x - laneX(w.lane)) < 0.9 &&
-        Math.abs(player.z - w.mesh.position.z) < 1.0
-      ) {
-        this.game.damagePlayer(w.damage);
+      // 벽이 충분히 솟은 뒤, 같은 레인에 있으면 1회 피해 (z 고정 보스전 — 레인 점유 기반)
+      const grown = w.duration - w.timer >= 0.15;
+      if (!w.hitDone && grown && w.timer > 0.1 && Math.abs(player.x - laneX(w.lane)) < 0.85) {
+        if (this.game.damagePlayer(w.damage)) w.hitDone = true;
       }
       if (w.timer <= 0) {
         this.game.scene.remove(w.mesh);
@@ -775,6 +767,7 @@ export class Boss {
       (f.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, f.life / 0.4);
       if (f.life <= 0) {
         this.game.scene.remove(f.mesh);
+        disposeMesh(f.mesh, true); // burstGeo 공유, 머티리얼만 해제
         this.fx.splice(i, 1);
       }
     }
@@ -815,6 +808,7 @@ export class Boss {
   private clearSummonRing(): void {
     if (this.summonRing) {
       this.game.scene.remove(this.summonRing);
+      disposeMesh(this.summonRing); // 소환진: 매번 새 지오/머티리얼 → 해제
       this.summonRing = null;
     }
   }
@@ -822,11 +816,16 @@ export class Boss {
   private clearHazards(): void {
     if (this.wave) {
       this.game.scene.remove(this.wave);
+      disposeMesh(this.wave, true); // waveGeo는 공유, 머티리얼만 해제
       this.wave = null;
     }
+    // blockWalls: 공유 wallGeo + 캐시 머티리얼 → scene 제거만
     this.blockWalls.forEach((w) => this.game.scene.remove(w.mesh));
     this.blockWalls = [];
-    this.fx.forEach((f) => this.game.scene.remove(f.mesh));
+    this.fx.forEach((f) => {
+      this.game.scene.remove(f.mesh);
+      disposeMesh(f.mesh, true); // burstGeo 공유, 머티리얼만 해제
+    });
     this.fx = [];
     this.group.position.z = this.z;
   }
@@ -835,7 +834,13 @@ export class Boss {
     this.clearMarkers();
     this.clearSummonRing();
     this.clearHazards();
-    this.markers.forEach((m) => this.game.scene.remove(m));
+    this.markers.forEach((m) => this.game.scene.remove(m)); // markerGeo/Mat 공유 → 제거만
+    this.markerMat.dispose(); // 인스턴스 전용 머티리얼
+    // 본체·아웃라인은 인스턴스마다 새로 생성 → 지오/머티리얼 해제
+    this.bodyGroup.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) disposeMesh(o as THREE.Mesh);
+    });
+    disposeMesh(this.outline);
     this.game.scene.remove(this.group);
     this.game.hud.setShade(0);
   }

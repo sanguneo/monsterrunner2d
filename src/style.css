@@ -51,28 +51,28 @@ body {
 
 .hud-top {
   position: absolute;
-  top: calc(8px + env(safe-area-inset-top));
-  left: calc(10px + env(safe-area-inset-left));
-  right: calc(10px + env(safe-area-inset-right));
+  top: calc(18px + env(safe-area-inset-top));
+  left: calc(18px + env(safe-area-inset-left));
+  right: calc(18px + env(safe-area-inset-right));
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
+  gap: 14px;
 }
 
 .hud-left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 150px;
+  gap: 6px;
+  min-width: 210px;
 }
 
 .hp-bar {
   position: relative;
-  width: 160px;
-  height: 20px;
+  width: 230px;
+  height: 30px;
   background: rgba(0, 0, 0, 0.55);
-  border-radius: 10px;
+  border-radius: 15px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
@@ -96,13 +96,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 700;
   text-shadow: 0 1px 2px #000;
 }
 
 .currency {
-  font-size: 14px;
+  font-size: 22px;
   font-weight: 700;
   text-shadow: 0 1px 3px #000;
 }
@@ -114,14 +114,14 @@ body {
 }
 
 .level-label {
-  font-size: 13px;
+  font-size: 19px;
   font-weight: 800;
   text-shadow: 0 1px 2px #000;
 }
 
 .exp-bar {
-  width: 90px;
-  height: 8px;
+  width: 140px;
+  height: 13px;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
@@ -140,26 +140,42 @@ body {
 }
 
 .distance {
-  font-size: 18px;
+  font-size: 30px;
   font-weight: 800;
   text-shadow: 0 1px 3px #000;
 }
 
 .score {
-  font-size: 13px;
+  font-size: 22px;
   opacity: 0.85;
   text-shadow: 0 1px 2px #000;
 }
 
+/* AI 생성 아이콘 (이모지 대체) — nanobanana webp */
+.ui-icon {
+  height: 1.15em;
+  width: auto;
+  vertical-align: -0.2em;
+}
+.hp-text {
+  gap: 3px;
+}
+.pause-icon {
+  width: 34px;
+  height: 34px;
+  display: block;
+  margin: auto;
+}
+
 .pause-btn {
   pointer-events: auto;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 18px;
+  font-size: 26px;
   cursor: pointer;
 }
 
@@ -167,7 +183,7 @@ body {
 
 .boss-wrap {
   position: absolute;
-  top: calc(76px + env(safe-area-inset-top));
+  top: calc(102px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   width: min(78vw, 420px);
@@ -231,19 +247,22 @@ body {
 
 /* ---------------- 스킬 버튼 ---------------- */
 
+/* 스킬: 우하단 반원(아크) 배치 — 모바일 엄지 도달 고려 */
 .skills {
   position: absolute;
-  right: calc(14px + env(safe-area-inset-right));
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  display: flex;
-  gap: 12px;
+  right: calc(22px + env(safe-area-inset-right));
+  bottom: calc(46px + env(safe-area-inset-bottom));
+  width: 0;
+  height: 0;
 }
+/* 아크 배치(반지름·각도)는 스킬 개수에 따라 HUD.layoutSkills()가 런타임에 계산해
+   각 버튼의 인라인 right/bottom으로 설정한다 (중심 = .skills 앵커 = 우하단 코너). */
 
 .skill-btn {
   pointer-events: auto;
-  position: relative;
-  width: 64px;
-  height: 64px;
+  position: absolute;
+  width: 82px;
+  height: 82px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.45);
   background: rgba(20, 14, 36, 0.75);
@@ -281,10 +300,10 @@ body {
 
 .skill-label {
   position: absolute;
-  bottom: -20px;
+  bottom: -22px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.95);
   background: rgba(0, 0, 0, 0.5);
@@ -301,6 +320,18 @@ body {
   100% { box-shadow: 0 0 6px 2px rgba(250, 204, 21, 0.35); transform: scale(1.0); }
 }
 .skill-btn.ready { animation: skillReady 0.5s ease-out forwards; border-color: rgba(250, 204, 21, 0.9); }
+
+.skill-icon {
+  position: absolute;
+  top: 18%;
+  left: 18%;
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
 
 /* ---------------- 플로팅 텍스트 ---------------- */
 
@@ -430,7 +461,7 @@ body {
 #screen-overlay.title-bg {
   background:
     linear-gradient(rgba(13, 8, 26, 0.45), rgba(13, 8, 26, 0.88)),
-    url('/assets/images/title_bg.png') center / cover no-repeat,
+    url('/assets/images/title_bg.webp') center / cover no-repeat,
     #15101f;
 }
 
@@ -461,6 +492,12 @@ body {
 .game-logo {
   font-size: 64px;
   animation: logoBob 2.4s ease-in-out infinite;
+}
+.game-logo-img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.5));
 }
 
 @keyframes logoBob {
@@ -552,15 +589,18 @@ body {
 
 .world-btn.locked {
   cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* 잠금 어둡기: filter 대신 오버레이 — 🔒 아이콘이 같이 어두워지지 않도록 */
+/* 잠금 어둡기 + 흑백화: filter 대신 오버레이 — 자물쇠 아이콘은 위(z-index)라 선명하게 유지 */
 .world-btn.locked::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(10, 6, 20, 0.6);
+  background: rgba(8, 5, 16, 0.72);
+  backdrop-filter: grayscale(1) brightness(0.7);
+  -webkit-backdrop-filter: grayscale(1) brightness(0.7);
 }
 
 .world-lock {
@@ -569,9 +609,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
   z-index: 1;
-  filter: drop-shadow(0 1px 3px #000);
+}
+
+.world-lock .lock-ico {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85));
+  opacity: 0.96;
 }
 
 .world-num {
@@ -811,4 +854,42 @@ body {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+}
+/* ============================================================
+   부팅 로더 — 번들/에셋 로드 동안 흰 화면 대신 표시 (검토의견 §2)
+   ============================================================ */
+#boot-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: #15101f;
+  transition: opacity 0.4s ease;
+}
+#boot-loader.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+.boot-ghost {
+  font-size: 64px;
+  animation: boot-bob 1.2s ease-in-out infinite;
+}
+.boot-spinner {
+  width: 38px;
+  height: 38px;
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #bcaaff;
+  border-radius: 50%;
+  animation: boot-spin 0.8s linear infinite;
+}
+@keyframes boot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes boot-spin {
+  to { transform: rotate(360deg); }
 }

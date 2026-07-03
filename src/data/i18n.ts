@@ -35,6 +35,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'hud.phase': '페이즈',
     'hud.skill.blast': '폭발',
     'hud.skill.dash': '돌진',
+    'hud.skill.rapidFire': '연사',
+    'hud.skill.healPulse': '회복',
+    'skill.rapidFire': '연사 폭주',
+    'skill.healPulse': '회복 파동',
 
     'boss.ghostTeacher': '유령 선생님',
     'boss.ghostGirl': '학교 괴담 소녀',
@@ -50,6 +54,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'boss.skullKing': '해골왕',
     'boss.weak': '약점!',
     'boss.incoming': '보스 등장!',
+    'banner.newSkill': '새 스킬 사용 가능!',
 
     'tut.run': '달리기는 저절로 돼요!',
     'tut.lane': '← → 키 / 좌우로 밀어서 보석을 먹어요!',
@@ -70,6 +75,8 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'reward.seawitch_crown': '바다마녀 왕관',
     'reward.dracula_cape': '드라큘라 망토',
     'reward.skull_crown': '해골왕 왕관',
+
+    'reward.skillUnlocked': '✨ 새 스킬 해금!',
 
     'result.title': '결과',
     'result.level': '도달 레벨',
@@ -124,6 +131,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'hud.phase': 'Phase',
     'hud.skill.blast': 'BLAST',
     'hud.skill.dash': 'DASH',
+    'hud.skill.rapidFire': 'RAPID',
+    'hud.skill.healPulse': 'HEAL',
+    'skill.rapidFire': 'Rapid Fire',
+    'skill.healPulse': 'Heal Pulse',
 
     'boss.ghostTeacher': 'Ghost Teacher',
     'boss.ghostGirl': 'Phantom School Girl',
@@ -139,6 +150,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'boss.skullKing': 'Skull King',
     'boss.weak': 'WEAK SPOT!',
     'boss.incoming': 'BOSS!',
+    'banner.newSkill': 'New skill ready!',
 
     'tut.run': 'Running is automatic!',
     'tut.lane': '← → keys / swipe to grab the gem!',
@@ -159,6 +171,8 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'reward.seawitch_crown': 'Sea Witch Crown',
     'reward.dracula_cape': 'Dracula Cape',
     'reward.skull_crown': 'Skull King Crown',
+
+    'reward.skillUnlocked': '✨ New Skill Unlocked!',
 
     'result.title': 'Results',
     'result.level': 'Level Reached',

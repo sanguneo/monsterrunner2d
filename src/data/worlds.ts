@@ -31,15 +31,7 @@ export interface MonsterDef {
 }
 
 export type BossPatternType =
-  | 'projectile'
-  | 'barrage'
-  | 'wave'
-  | 'walls'
-  | 'chase'
-  | 'rush'
-  | 'summon'
-  | 'teleport'
-  | 'scream';
+  'projectile' | 'barrage' | 'wave' | 'walls' | 'chase' | 'rush' | 'summon' | 'teleport' | 'scream';
 
 export type EnemyProjShape = 'ball' | 'rod' | 'shard';
 
@@ -128,7 +120,14 @@ type Extra = Partial<PatternDef>;
 function proj(telegraph: number, damage: number, projSpeed: number, lanes = 1, extra: Extra = {}): PatternDef {
   return { type: 'projectile', telegraph, damage, projSpeed, lanes, recovery: 0.4, ...extra };
 }
-function barrage(telegraph: number, damage: number, projSpeed: number, shots: number, interval: number, extra: Extra = {}): PatternDef {
+function barrage(
+  telegraph: number,
+  damage: number,
+  projSpeed: number,
+  shots: number,
+  interval: number,
+  extra: Extra = {},
+): PatternDef {
   return { type: 'barrage', telegraph, damage, projSpeed, shots, interval, recovery: 0.5, ...extra };
 }
 function wave(telegraph: number, damage: number, stagger: number, waveSpeed = 14, extra: Extra = {}): PatternDef {
@@ -157,14 +156,14 @@ function scream(telegraph: number, damage: number, fireLock = 1.0, stagger = 1.5
 // ---------- 이미지 에셋 경로 (public/assets/images) ----------
 
 export function worldImage(idx: number): string {
-  return `/assets/images/world_${idx + 1}_${WORLDS[idx].id}.png`;
+  return `/assets/images/world_${idx + 1}_${WORLDS[idx].id}.webp`;
 }
 
 export function rewardImage(itemId: string): string {
-  return `/assets/images/reward_${itemId}.png`;
+  return `/assets/images/reward_${itemId}.webp`;
 }
 
-export const TITLE_BG_IMAGE = '/assets/images/title_bg.png';
+export const TITLE_BG_IMAGE = '/assets/images/title_bg.webp';
 
 // ---------- 보상 아이템 ----------
 
@@ -186,12 +185,27 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.school',
     emoji: '🏫',
     theme: {
-      bg: 0x241a38, bgDark: 0x120a1c, floor: 0x4a3f63, wallA: 0x37304f, wallB: 0x2a2440,
-      obsLow: 0xb45309, obsHigh: 0x7c3aed, obsBlock: 0x57534e,
+      bg: 0x241a38,
+      bgDark: 0x120a1c,
+      floor: 0x4a3f63,
+      wallA: 0x37304f,
+      wallB: 0x2a2440,
+      obsLow: 0xb45309,
+      obsHigh: 0x7c3aed,
+      obsBlock: 0x57534e,
     },
     monsters: [
       { id: 'bookGhost', shape: 'box', color: 0x8b5a2b, hp: 20, contact: 10, behavior: 'slow', speed: 2.0, exp: 8 },
-      { id: 'pencilGhost', shape: 'cone', color: 0xffd54a, hp: 15, contact: 10, behavior: 'straight', speed: 5.0, exp: 6 },
+      {
+        id: 'pencilGhost',
+        shape: 'cone',
+        color: 0xffd54a,
+        hp: 15,
+        contact: 10,
+        behavior: 'straight',
+        speed: 5.0,
+        exp: 6,
+      },
       { id: 'paperGhost', shape: 'tetra', color: 0xffffff, hp: 12, contact: 8, behavior: 'weave', speed: 4.0, exp: 5 },
     ],
     midBoss: {
@@ -210,7 +224,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['chalk', 'summon', 'shockwave'], gap: 1.0 },
-        { from: 0.5, queue: ['chalk2', 'shockwave', 'chalk2', 'summon'], gap: 0.7, mods: { telegraphMult: 0.75, staggerMult: 0.75 } },
+        {
+          from: 0.5,
+          queue: ['chalk2', 'shockwave', 'chalk2', 'summon'],
+          gap: 0.7,
+          mods: { telegraphMult: 0.75, staggerMult: 0.75 },
+        },
       ],
       visual: [
         { geo: 'box', size: [1.4, 1.8, 0.8], color: 0x6b7280, emissive: 0x1f2430, pos: [0, 1.1, 0], opacity: 0.95 },
@@ -234,7 +253,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['hair', 'teleport', 'hair'], gap: 1.2 },
         { from: 0.66, queue: ['teleport', 'hair2', 'scream', 'hair2'], gap: 1.0 },
-        { from: 0.33, queue: ['teleport+hair2', 'scream', 'teleport+hair2'], gap: 0.6, mods: { telegraphMult: 0.7, staggerMult: 0.67 } },
+        {
+          from: 0.33,
+          queue: ['teleport+hair2', 'scream', 'teleport+hair2'],
+          gap: 0.6,
+          mods: { telegraphMult: 0.7, staggerMult: 0.67 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.5, 1.3], color: 0xf5f5f4, emissive: 0x44403c, pos: [0, 1.3, 0], opacity: 0.96 },
@@ -252,8 +276,14 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.zombie',
     emoji: '🧟',
     theme: {
-      bg: 0x1c2a1c, bgDark: 0x0c140c, floor: 0x3a4a35, wallA: 0x2c3b28, wallB: 0x223020,
-      obsLow: 0x854d0e, obsHigh: 0x3f6212, obsBlock: 0x44403c,
+      bg: 0x1c2a1c,
+      bgDark: 0x0c140c,
+      floor: 0x3a4a35,
+      wallA: 0x2c3b28,
+      wallB: 0x223020,
+      obsLow: 0x854d0e,
+      obsHigh: 0x3f6212,
+      obsBlock: 0x44403c,
     },
     monsters: [
       { id: 'zombie', shape: 'capsule', color: 0x4d7c0f, hp: 27, contact: 12, behavior: 'slow', speed: 2.2, exp: 11 },
@@ -275,7 +305,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['vomit', 'summon', 'slam'], gap: 1.1 },
-        { from: 0.5, queue: ['vomit', 'slam', 'vomit', 'summon'], gap: 0.8, mods: { telegraphMult: 0.8, staggerMult: 0.8 } },
+        {
+          from: 0.5,
+          queue: ['vomit', 'slam', 'vomit', 'summon'],
+          gap: 0.8,
+          mods: { telegraphMult: 0.8, staggerMult: 0.8 },
+        },
       ],
       visual: [
         { geo: 'box', size: [1.8, 2.2, 1.0], color: 0x4d7c0f, emissive: 0x1a2e05, pos: [0, 1.3, 0] },
@@ -303,7 +338,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['grave', 'charge', 'summon'], gap: 1.1 },
         { from: 0.6, queue: ['grave2', 'roar', 'charge'], gap: 0.9 },
-        { from: 0.3, queue: ['grave2', 'roar', 'charge', 'summon'], gap: 0.6, mods: { telegraphMult: 0.75, staggerMult: 0.7 } },
+        {
+          from: 0.3,
+          queue: ['grave2', 'roar', 'charge', 'summon'],
+          gap: 0.6,
+          mods: { telegraphMult: 0.75, staggerMult: 0.7 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.7, 1.6], color: 0x3f6212, emissive: 0x14250a, pos: [0, 1.5, 0] },
@@ -322,12 +362,27 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.lab',
     emoji: '⚡',
     theme: {
-      bg: 0x16222e, bgDark: 0x0a1118, floor: 0x37474f, wallA: 0x263238, wallB: 0x1c272c,
-      obsLow: 0x0e7490, obsHigh: 0x6d28d9, obsBlock: 0x475569,
+      bg: 0x16222e,
+      bgDark: 0x0a1118,
+      floor: 0x37474f,
+      wallA: 0x263238,
+      wallB: 0x1c272c,
+      obsLow: 0x0e7490,
+      obsHigh: 0x6d28d9,
+      obsBlock: 0x475569,
     },
     monsters: [
       { id: 'wireGolem', shape: 'box', color: 0x607d8b, hp: 34, contact: 14, behavior: 'slow', speed: 2.4, exp: 14 },
-      { id: 'sparkBot', shape: 'spiky', color: 0x22d3ee, hp: 26, contact: 14, behavior: 'straight', speed: 6.0, exp: 11 },
+      {
+        id: 'sparkBot',
+        shape: 'spiky',
+        color: 0x22d3ee,
+        hp: 26,
+        contact: 14,
+        behavior: 'straight',
+        speed: 6.0,
+        exp: 11,
+      },
       { id: 'drone', shape: 'tetra', color: 0xa78bfa, hp: 20, contact: 12, behavior: 'weave', speed: 5.0, exp: 9 },
     ],
     midBoss: {
@@ -347,7 +402,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['bolt', 'strike', 'surge'], gap: 1.0 },
-        { from: 0.5, queue: ['bolt2', 'strike', 'surge', 'bolt2'], gap: 0.7, mods: { telegraphMult: 0.75, staggerMult: 0.8 } },
+        {
+          from: 0.5,
+          queue: ['bolt2', 'strike', 'surge', 'bolt2'],
+          gap: 0.7,
+          mods: { telegraphMult: 0.75, staggerMult: 0.8 },
+        },
       ],
       visual: [
         { geo: 'box', size: [1.7, 2.0, 1.1], color: 0x475569, emissive: 0x0e7490, pos: [0, 1.2, 0] },
@@ -375,7 +435,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['surge', 'blink', 'sparkBarrage'], gap: 1.1 },
         { from: 0.66, queue: ['blink', 'sparkBarrage', 'overload', 'surge'], gap: 0.9 },
-        { from: 0.33, queue: ['blink+sparkBarrage', 'overload', 'blink+surge', 'summon'], gap: 0.6, mods: { telegraphMult: 0.7, staggerMult: 0.67 } },
+        {
+          from: 0.33,
+          queue: ['blink+sparkBarrage', 'overload', 'blink+surge', 'summon'],
+          gap: 0.6,
+          mods: { telegraphMult: 0.7, staggerMult: 0.67 },
+        },
       ],
       visual: [
         { geo: 'box', size: [1.5, 2.0, 0.9], color: 0x4d7c0f, emissive: 0x1a2e05, pos: [0, 1.2, 0] },
@@ -395,12 +460,27 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.sea',
     emoji: '🌊',
     theme: {
-      bg: 0x0e2235, bgDark: 0x071521, floor: 0x1d3a52, wallA: 0x16324a, wallB: 0x102840,
-      obsLow: 0x0369a1, obsHigh: 0x0d9488, obsBlock: 0x334155,
+      bg: 0x0e2235,
+      bgDark: 0x071521,
+      floor: 0x1d3a52,
+      wallA: 0x16324a,
+      wallB: 0x102840,
+      obsLow: 0x0369a1,
+      obsHigh: 0x0d9488,
+      obsBlock: 0x334155,
     },
     monsters: [
       { id: 'pufferfish', shape: 'spiky', color: 0xfb923c, hp: 41, contact: 16, behavior: 'slow', speed: 2.6, exp: 17 },
-      { id: 'sharkFin', shape: 'tetra', color: 0x64748b, hp: 31, contact: 16, behavior: 'straight', speed: 6.5, exp: 13 },
+      {
+        id: 'sharkFin',
+        shape: 'tetra',
+        color: 0x64748b,
+        hp: 31,
+        contact: 16,
+        behavior: 'straight',
+        speed: 6.5,
+        exp: 13,
+      },
       { id: 'jellyfish', shape: 'cone', color: 0xf9a8d4, hp: 25, contact: 14, behavior: 'weave', speed: 5.5, exp: 11 },
     ],
     midBoss: {
@@ -420,7 +500,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['tentacle', 'ink', 'tide'], gap: 1.0 },
-        { from: 0.5, queue: ['tentacle2', 'tide', 'ink', 'tentacle'], gap: 0.75, mods: { telegraphMult: 0.78, staggerMult: 0.8 } },
+        {
+          from: 0.5,
+          queue: ['tentacle2', 'tide', 'ink', 'tentacle'],
+          gap: 0.75,
+          mods: { telegraphMult: 0.78, staggerMult: 0.8 },
+        },
       ],
       visual: [
         { geo: 'sphere', size: [1.1], color: 0x7e22ce, emissive: 0x2e1065, pos: [0, 1.6, 0] },
@@ -449,7 +534,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['bubble', 'teleport', 'whirl'], gap: 1.1 },
         { from: 0.66, queue: ['teleport', 'bubble2', 'song', 'whirl'], gap: 0.9 },
-        { from: 0.33, queue: ['teleport+bubble2', 'song', 'teleport+whirl'], gap: 0.6, mods: { telegraphMult: 0.7, staggerMult: 0.67 } },
+        {
+          from: 0.33,
+          queue: ['teleport+bubble2', 'song', 'teleport+whirl'],
+          gap: 0.6,
+          mods: { telegraphMult: 0.7, staggerMult: 0.67 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.6, 1.4], color: 0x0e7490, emissive: 0x083344, pos: [0, 1.4, 0] },
@@ -468,8 +558,14 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.dracula',
     emoji: '🦇',
     theme: {
-      bg: 0x29141f, bgDark: 0x140810, floor: 0x4a2735, wallA: 0x3b1f2c, wallB: 0x2c1620,
-      obsLow: 0x9f1239, obsHigh: 0x7f1d1d, obsBlock: 0x3f3f46,
+      bg: 0x29141f,
+      bgDark: 0x140810,
+      floor: 0x4a2735,
+      wallA: 0x3b1f2c,
+      wallB: 0x2c1620,
+      obsLow: 0x9f1239,
+      obsHigh: 0x7f1d1d,
+      obsBlock: 0x3f3f46,
     },
     monsters: [
       { id: 'ghoul', shape: 'capsule', color: 0x78716c, hp: 48, contact: 18, behavior: 'slow', speed: 2.8, exp: 20 },
@@ -492,7 +588,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['claw', 'pounce', 'howl'], gap: 0.95 },
-        { from: 0.5, queue: ['claw2', 'pounce', 'claw2', 'howl'], gap: 0.7, mods: { telegraphMult: 0.75, staggerMult: 0.8 } },
+        {
+          from: 0.5,
+          queue: ['claw2', 'pounce', 'claw2', 'howl'],
+          gap: 0.7,
+          mods: { telegraphMult: 0.75, staggerMult: 0.8 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.65, 1.5], color: 0x57534e, emissive: 0x1c1917, pos: [0, 1.4, 0] },
@@ -523,7 +624,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['bloodBarrage', 'batform', 'batswarm'], gap: 1.0 },
         { from: 0.66, queue: ['batform', 'batswarm2', 'hypnosis', 'bloodBarrage'], gap: 0.85 },
-        { from: 0.33, queue: ['batform+batswarm2', 'hypnosis', 'batform+bloodBarrage'], gap: 0.55, mods: { telegraphMult: 0.7, staggerMult: 0.67 } },
+        {
+          from: 0.33,
+          queue: ['batform+batswarm2', 'hypnosis', 'batform+bloodBarrage'],
+          gap: 0.55,
+          mods: { telegraphMult: 0.7, staggerMult: 0.67 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.55, 1.5], color: 0x18181b, emissive: 0x450a0a, pos: [0, 1.4, 0] },
@@ -542,12 +648,27 @@ export const WORLDS: WorldDef[] = [
     nameKey: 'world.skull',
     emoji: '💀',
     theme: {
-      bg: 0x1f1d24, bgDark: 0x0e0d12, floor: 0x44404e, wallA: 0x35323e, wallB: 0x282530,
-      obsLow: 0xa16207, obsHigh: 0x6b21a8, obsBlock: 0x52525b,
+      bg: 0x1f1d24,
+      bgDark: 0x0e0d12,
+      floor: 0x44404e,
+      wallA: 0x35323e,
+      wallB: 0x282530,
+      obsLow: 0xa16207,
+      obsHigh: 0x6b21a8,
+      obsBlock: 0x52525b,
     },
     monsters: [
       { id: 'boneGolem', shape: 'box', color: 0xd6d3d1, hp: 55, contact: 20, behavior: 'slow', speed: 3.0, exp: 23 },
-      { id: 'skeletonSoldier', shape: 'capsule', color: 0xe7e5e4, hp: 41, contact: 20, behavior: 'straight', speed: 7.5, exp: 18 },
+      {
+        id: 'skeletonSoldier',
+        shape: 'capsule',
+        color: 0xe7e5e4,
+        hp: 41,
+        contact: 20,
+        behavior: 'straight',
+        speed: 7.5,
+        exp: 18,
+      },
       { id: 'skullBird', shape: 'tetra', color: 0xa8a29e, hp: 33, contact: 18, behavior: 'weave', speed: 6.5, exp: 15 },
     ],
     midBoss: {
@@ -567,7 +688,12 @@ export const WORLDS: WorldDef[] = [
       },
       phases: [
         { from: 1.0, queue: ['spear', 'boneWall', 'shieldCharge'], gap: 0.9 },
-        { from: 0.5, queue: ['spear2', 'shieldCharge', 'boneWall', 'spear2'], gap: 0.65, mods: { telegraphMult: 0.75, staggerMult: 0.8 } },
+        {
+          from: 0.5,
+          queue: ['spear2', 'shieldCharge', 'boneWall', 'spear2'],
+          gap: 0.65,
+          mods: { telegraphMult: 0.75, staggerMult: 0.8 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.6, 1.5], color: 0xe7e5e4, emissive: 0x44403c, pos: [0, 1.4, 0] },
@@ -598,7 +724,12 @@ export const WORLDS: WorldDef[] = [
       phases: [
         { from: 1.0, queue: ['boneStorm', 'warp', 'sweep'], gap: 0.95 },
         { from: 0.66, queue: ['warp', 'deathHand', 'deathCry', 'boneStorm'], gap: 0.8 },
-        { from: 0.33, queue: ['warp+boneStorm', 'deathCry', 'warp+deathHand', 'summon'], gap: 0.5, mods: { telegraphMult: 0.65, staggerMult: 0.65 } },
+        {
+          from: 0.33,
+          queue: ['warp+boneStorm', 'deathCry', 'warp+deathHand', 'summon'],
+          gap: 0.5,
+          mods: { telegraphMult: 0.65, staggerMult: 0.65 },
+        },
       ],
       visual: [
         { geo: 'capsule', size: [0.65, 1.6], color: 0x1c1917, emissive: 0x0c0a09, pos: [0, 1.5, 0] },

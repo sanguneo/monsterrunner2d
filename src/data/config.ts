@@ -3,9 +3,7 @@
 // 모든 밸런스 조정은 이 파일에서만 한다.
 // ============================================================
 
-export type PatternId =
-  | 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
-  | 'P6' | 'P7' | 'P8' | 'P9' | 'P10';
+export type PatternId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8' | 'P9' | 'P10';
 
 export interface BossPhaseConfig {
   from: number;
@@ -36,6 +34,7 @@ export const CONFIG = {
     monsterSpawnIntervalEnd: 2.0,
     arenaBossDistance: 12,
     tutorialSpeed: 7,
+    stageIntroDuration: 3.0, // 스테이지 인트로(월드 이미지) 표시 시간(초)
   },
 
   player: {
@@ -53,6 +52,15 @@ export const CONFIG = {
   },
 
   projectiles: { playerSpeed: 40, playerLife: 1.2 },
+  // 충돌/명중 판정 반경 (검토의견 §5 — 매직넘버 단일화)
+  combat: {
+    monsterHitRadius: 0.75, // 플레이어 발사체 vs 몬스터
+    bossHitRadius: 1.4, // 플레이어 발사체 vs 보스
+    monsterContact: 0.9, // 몬스터 접촉 판정(피격 히트박스 스케일 곱)
+    pickupRadius: 1.0, // 수집물 관대 판정
+    enemyProjHalfX: 0.8, // 적 투사체 vs 플레이어 X 반폭(스케일 곱 + 0.15)
+    enemyProjHalfZ: 0.7,
+  },
 
   progression: {
     expCurve: (level: number) => 50 * level,
@@ -65,11 +73,14 @@ export const CONFIG = {
     slot1: { id: 'blast' as const, dmgMult: 4, range: 14, cooldown: 8, equipped: true },
     slot2: { id: 'dash' as const, duration: 1.5, speedBonus: 0.5, cooldown: 12, equipped: true },
     pool: {
-      rapidFire: { fireMult: 0.5, duration: 5, cooldown: 14 }, // 해금 예정(로직만)
-      healPulse: { heal: 40, cooldown: 20 }, // 해금 예정(로직만)
+      rapidFire: { fireMult: 0.5, duration: 5, cooldown: 14 }, // 3월드 클리어 시 해금
+      healPulse: { heal: 40, cooldown: 20 }, // 5월드 클리어 시 해금
     },
     autoDashIdleDelay: 3.0, // 자동 모드: 위협 미감지 시 준비 후 이 시간 지나면 발동
     autoDashLookAhead: 0.45, // 자동 대시 위협 감지 예측 시간(초)
+    // 스킬 해금 조건: 클리어한 월드 수(= unlockedWorldIdx)가 이 값 이상이면 사용 가능
+    unlocks: { rapidFire: 3, healPulse: 5 },
+    autoHealHpFrac: 0.55, // 자동 회복 파동: 체력 비율이 이 값 이하일 때 발동
   },
 
   obstacles: {
@@ -115,9 +126,11 @@ export const CONFIG = {
   },
 
   storage: {
-    highScoreKey: 'mhr_highscore',
+    highScorePrefix: 'mhr_highscore_', // 월드별 최고점수: mhr_highscore_<worldId>
+    legacyHighScoreKey: 'mhr_highscore', // 구버전 글로벌 키 (1월드로 1회 이관 후 제거)
     worldUnlockKey: 'mhr_world_unlocked', // 해금된 최대 월드 인덱스
     itemsKey: 'mhr_items', // 획득한 보상 장비 목록
+    skillAnnouncedKey: 'mhr_skill_announced', // 인게임 배너로 안내 완료한 해금 스킬
   },
   i18n: { defaultLocale: 'ko' as const, locales: ['ko', 'en'] as const },
 };

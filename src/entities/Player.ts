@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { CONFIG, laneX } from '../data/config';
 import type { Action, Input } from '../core/Input';
+import type { SoundId } from '../systems/Sound';
 
 export class Player {
   // --- 위치/동작 상태 ---
@@ -41,6 +42,8 @@ export class Player {
   private capeMesh: THREE.Mesh | null = null;
   private hatMesh: THREE.Mesh | null = null;
   private time = 0;
+  /** 동작 성공 시 효과음 재생 훅 (Game이 SoundManager로 연결) */
+  sfx: ((id: SoundId) => void) | null = null;
 
   constructor() {
     this.group = new THREE.Group();
@@ -195,6 +198,7 @@ export class Player {
           this.sliding = false;
           this.vy = this.jumpVelocity();
           this.y = Math.max(this.y, 0.001);
+          this.sfx?.('jump');
           return true;
         }
         return false;
@@ -203,6 +207,7 @@ export class Player {
         if (!this.airborne) {
           this.sliding = true;
           this.slideTimer = CONFIG.run.slideDuration;
+          this.sfx?.('slide');
           return true;
         }
         // 공중 슬라이드 입력 → 빠른 낙하 + 착지 시 큐 실행
@@ -217,6 +222,7 @@ export class Player {
     this.laneFrom = this.x;
     this.lane = target;
     this.laneT = 0;
+    this.sfx?.('laneMove');
   }
 
   takeDamage(amount: number): boolean {

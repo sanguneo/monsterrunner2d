@@ -5,8 +5,9 @@
 
 import { t, getLocale, setLocale, onLocaleChange } from '../data/i18n';
 import type { Locale } from '../data/i18n';
-import { WORLDS, REWARD_ITEMS, worldImage, rewardImage, TITLE_BG_IMAGE } from '../data/worlds';
+import { WORLDS, worldImage, rewardImage, TITLE_BG_IMAGE } from '../data/worlds';
 import type { Game } from '../core/Game';
+import { uiIcon } from './icons';
 
 export interface ResultData {
   level: number;
@@ -25,6 +26,7 @@ export interface RewardData {
   itemId: string;
   emoji: string;
   nameKey: string;
+  unlockedSkillKey?: string;
 }
 
 export interface GameOverData {
@@ -36,6 +38,14 @@ export interface GameOverData {
 }
 
 type ScreenName = 'title' | 'pause' | 'result' | 'gameover' | 'reward' | 'stageintro' | null;
+
+/** 잠긴 월드 오버레이용 자물쇠 아이콘 (인라인 SVG — 래스터 에셋 불필요) */
+const LOCK_SVG = `<svg class="lock-ico" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+  <path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+  <rect x="4.5" y="10" width="15" height="10.5" rx="2.4" fill="#fff"/>
+  <circle cx="12" cy="14.6" r="1.7" fill="#2a1c44"/>
+  <rect x="11.2" y="15" width="1.6" height="3.4" rx="0.8" fill="#2a1c44"/>
+</svg>`;
 
 export class Screens {
   private root: HTMLElement;
@@ -68,10 +78,16 @@ export class Screens {
 
     onLocaleChange(() => this.rerender());
 
-    // 이미지 에셋 프리로드 (스테이지 인트로/보상 화면 즉시 표시용)
+    // 이미지 프리로드: 타이틀 배경 + 현재 월드만. 나머지 월드/보상은 지연 로드 (검토의견 §2)
     new Image().src = TITLE_BG_IMAGE;
-    WORLDS.forEach((_, i) => (new Image().src = worldImage(i)));
-    Object.keys(REWARD_ITEMS).forEach((id) => (new Image().src = rewardImage(id)));
+    this.preloadWorld(this.game.worldIdx);
+  }
+
+  /** 특정 월드의 인트로/보상 이미지를 미리 로드 (선택 시·진입 직전 호출) */
+  preloadWorld(idx: number): void {
+    new Image().src = worldImage(idx);
+    const reward = WORLDS[idx]?.reward;
+    if (reward) new Image().src = rewardImage(reward);
   }
 
   private rerender(): void {
@@ -110,16 +126,16 @@ export class Screens {
       return `<button class="world-btn ${selected ? 'selected' : ''} ${locked ? 'locked' : ''}"
         data-world="${i}" ${locked ? 'disabled' : ''} title="${t(w.nameKey)}"
         style="background-image:url('${worldImage(i)}')">
-        ${locked ? '<span class="world-lock">🔒</span>' : ''}<span class="world-num">${i + 1}</span>
+        ${locked ? `<span class="world-lock">${LOCK_SVG}</span>` : ''}<span class="world-num">${i + 1}</span>
       </button>`;
     }).join('');
 
     this.overlay.innerHTML = `
       <div class="screen title-screen">
-        <div class="game-logo">👻</div>
+        <div class="game-logo">${uiIcon('ghost', 'game-logo-img')}</div>
         <h1 class="game-title">${t('title.name')}</h1>
         <p class="game-subtitle">${t('title.subtitle')}</p>
-        ${high > 0 ? `<p class="highscore">🏆 ${t('title.highscore')}: ${high.toLocaleString()}</p>` : ''}
+        ${high > 0 ? `<p class="highscore">${uiIcon('trophy')} ${this.game.world.emoji} ${t('title.highscore')}: ${high.toLocaleString()}</p>` : ''}
         <div class="world-select">
           <div class="settings-title">${t('title.selectWorld')}</div>
           <div class="world-grid">${worldBtns}</div>
@@ -202,6 +218,7 @@ export class Screens {
         <h2 class="reward-title">${t('reward.title')}</h2>
         <img class="reward-img" src="${rewardImage(data.itemId)}" alt="${t(data.nameKey)}" />
         <p class="reward-text">${data.emoji} ${t(data.nameKey)} ${t('reward.got')}</p>
+        ${data.unlockedSkillKey ? `<p class="reward-text">${t('reward.skillUnlocked')} — ${t(data.unlockedSkillKey)}</p>` : ''}
         <p class="reward-tap">${t('reward.tap')}</p>
       </div>
     `;
@@ -252,8 +269,8 @@ export class Screens {
           <div class="stat"><span>${t('result.level')}</span><b>Lv.${data.level}</b></div>
           <div class="stat"><span>${t('result.kills')}</span><b>${data.kills}</b></div>
           <div class="stat"><span>${t('result.bosses')}</span><b>${data.bossKills}</b></div>
-          <div class="stat"><span>${t('result.coins')}</span><b>🪙 ${data.coins}</b></div>
-          <div class="stat"><span>${t('result.gems')}</span><b>💎 ${data.gems}</b></div>
+          <div class="stat"><span>${t('result.coins')}</span><b>${uiIcon('coin')} ${data.coins}</b></div>
+          <div class="stat"><span>${t('result.gems')}</span><b>${uiIcon('gem')} ${data.gems}</b></div>
         </div>
         ${data.hasNextWorld ? `<button class="btn btn-primary" data-act="next">${t('result.nextWorld')}</button>` : ''}
         <button class="btn ${data.hasNextWorld ? '' : 'btn-primary'}" data-act="retry">${t('result.retry')}</button>
@@ -278,7 +295,7 @@ export class Screens {
         <div class="stat-grid">
           <div class="stat"><span>${t('result.distance')}</span><b>${Math.floor(data.distance)}m</b></div>
           <div class="stat"><span>${t('result.level')}</span><b>Lv.${data.level}</b></div>
-          <div class="stat"><span>${t('result.coins')}</span><b>🪙 ${data.coins}</b></div>
+          <div class="stat"><span>${t('result.coins')}</span><b>${uiIcon('coin')} ${data.coins}</b></div>
           <div class="stat"><span>${t('result.score')}</span><b>${data.score.toLocaleString()}</b></div>
         </div>
         ${data.canRevive ? `<button class="btn btn-primary" data-act="revive">${t('over.revive')}</button>` : ''}
