@@ -457,12 +457,13 @@ body {
   overflow-y: auto;
 }
 
-/* 타이틀 배경 이미지 (어두운 그라데이션으로 가독성 확보) */
+/* 타이틀 배경 이미지 (어두운 그라데이션으로 가독성 확보)
+   실제 이미지 url은 base 경로 대응 위해 Screens에서 인라인으로 설정 */
 #screen-overlay.title-bg {
-  background:
-    linear-gradient(rgba(13, 8, 26, 0.45), rgba(13, 8, 26, 0.88)),
-    url('/assets/images/title_bg.webp') center / cover no-repeat,
-    #15101f;
+  background-color: #15101f;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .screen {

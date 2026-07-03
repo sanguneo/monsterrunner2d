@@ -3,7 +3,7 @@
 // public/assets/icons/<name>.webp
 // ============================================================
 
-export const ICON_DIR = '/assets/icons';
+export const ICON_DIR = `${import.meta.env.BASE_URL}assets/icons`;
 
 /** 인라인 아이콘 <img> 마크업. cls 기본값 'ui-icon'(텍스트 높이에 맞춤). */
 export function uiIcon(name: string, cls = 'ui-icon'): string {

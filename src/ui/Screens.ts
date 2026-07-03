@@ -102,14 +102,19 @@ export class Screens {
   hide(): void {
     this.overlay.hidden = true;
     this.overlay.classList.remove('title-bg');
+    this.overlay.style.backgroundImage = '';
     this.current = null;
   }
 
-  /** 화면 표시 공통 준비 — 타이틀 배경 이미지는 타이틀에서만 */
+  /** 화면 표시 공통 준비 — 타이틀 배경 이미지는 타이틀에서만 (base 경로 대응 인라인) */
   private open(name: Exclude<ScreenName, null>): void {
     this.current = name;
     this.overlay.hidden = false;
-    this.overlay.classList.toggle('title-bg', name === 'title');
+    const isTitle = name === 'title';
+    this.overlay.classList.toggle('title-bg', isTitle);
+    this.overlay.style.backgroundImage = isTitle
+      ? `linear-gradient(rgba(13, 8, 26, 0.45), rgba(13, 8, 26, 0.88)), url('${TITLE_BG_IMAGE}')`
+      : '';
   }
 
   // ----------------------------------------------------------

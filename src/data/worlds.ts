@@ -154,16 +154,18 @@ function scream(telegraph: number, damage: number, fireLock = 1.0, stagger = 1.5
 }
 
 // ---------- 이미지 에셋 경로 (public/assets/images) ----------
+// GitHub Pages 서브경로 대응: import.meta.env.BASE_URL 접두
+const ASSET_BASE = import.meta.env.BASE_URL;
 
 export function worldImage(idx: number): string {
-  return `/assets/images/world_${idx + 1}_${WORLDS[idx].id}.webp`;
+  return `${ASSET_BASE}assets/images/world_${idx + 1}_${WORLDS[idx].id}.webp`;
 }
 
 export function rewardImage(itemId: string): string {
-  return `/assets/images/reward_${itemId}.webp`;
+  return `${ASSET_BASE}assets/images/reward_${itemId}.webp`;
 }
 
-export const TITLE_BG_IMAGE = '/assets/images/title_bg.webp';
+export const TITLE_BG_IMAGE = `${ASSET_BASE}assets/images/title_bg.webp`;
 
 // ---------- 보상 아이템 ----------
 
