@@ -9,3 +9,8 @@ export const ICON_DIR = `${import.meta.env.BASE_URL}assets/icons`;
 export function uiIcon(name: string, cls = 'ui-icon'): string {
   return `<img class="${cls}" src="${ICON_DIR}/${name}.webp" alt="" draggable="false" />`;
 }
+
+/** 월드 테마 아이콘 (theme_<worldId>.webp) — 이모지 대체 */
+export function worldThemeIcon(id: string, cls = 'ui-icon'): string {
+  return uiIcon(`theme_${id}`, cls);
+}

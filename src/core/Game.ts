@@ -32,7 +32,7 @@ import { SoundManager } from '../systems/Sound';
 import type { SoundId } from '../systems/Sound';
 import { HUD } from '../ui/HUD';
 import { Screens } from '../ui/Screens';
-import { uiIcon } from '../ui/icons';
+import { uiIcon, worldThemeIcon } from '../ui/icons';
 
 export type GameStateName =
   'TITLE' | 'TUTORIAL' | 'RUNNING_1' | 'MIDBOSS' | 'RUNNING_2' | 'FINALBOSS' | 'REWARD' | 'RESULT' | 'GAMEOVER';
@@ -592,7 +592,7 @@ export class Game {
     this.input.clear();
     // 새로 해금된 스킬이 있으면 그 안내를 우선, 없으면 월드 배너
     if (!this.announceUnlockedSkills()) {
-      this.hud.showBanner(`${this.world.emoji} ${t(this.world.nameKey)}`, 1.6);
+      this.hud.showBanner(`${worldThemeIcon(this.world.id)} ${t(this.world.nameKey)}`, 1.6);
     }
   }
 

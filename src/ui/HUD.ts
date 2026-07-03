@@ -354,7 +354,7 @@ export class HUD {
 
   /** 중앙 배너 (보스 등장 등) */
   showBanner(text: string, duration = 1.6): void {
-    this.banner.textContent = text;
+    this.banner.innerHTML = text; // 아이콘 img 포함 가능 (내부 생성 문자열만 사용)
     this.banner.hidden = false;
     this.banner.classList.remove('pop');
     void this.banner.offsetWidth;

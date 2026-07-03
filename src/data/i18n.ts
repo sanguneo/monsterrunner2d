@@ -76,7 +76,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'reward.dracula_cape': '드라큘라 망토',
     'reward.skull_crown': '해골왕 왕관',
 
-    'reward.skillUnlocked': '✨ 새 스킬 해금!',
+    'reward.skillUnlocked': '새 스킬 해금!',
 
     'result.title': '결과',
     'result.level': '도달 레벨',
@@ -86,14 +86,14 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'result.gems': '보석',
     'result.distance': '달린 거리',
     'result.score': '점수',
-    'result.newRecord': '🎉 신기록!',
+    'result.newRecord': '신기록!',
     'result.nextWorld': '다음 월드 ▶',
-    'result.master': '👑 몬스터 마스터 달성!',
+    'result.master': '몬스터 마스터 달성!',
     'result.retry': '다시 하기',
     'result.toTitle': '타이틀로',
 
     'over.title': '게임 오버',
-    'over.revive': '💫 체크포인트에서 부활',
+    'over.revive': '체크포인트에서 부활',
 
     'pause.title': '일시정지',
     'pause.resume': '계속하기',
@@ -172,7 +172,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'reward.dracula_cape': 'Dracula Cape',
     'reward.skull_crown': 'Skull King Crown',
 
-    'reward.skillUnlocked': '✨ New Skill Unlocked!',
+    'reward.skillUnlocked': 'New Skill Unlocked!',
 
     'result.title': 'Results',
     'result.level': 'Level Reached',
@@ -182,14 +182,14 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'result.gems': 'Gems',
     'result.distance': 'Distance',
     'result.score': 'Score',
-    'result.newRecord': '🎉 New Record!',
+    'result.newRecord': 'New Record!',
     'result.nextWorld': 'Next World ▶',
-    'result.master': '👑 MONSTER MASTER!',
+    'result.master': 'MONSTER MASTER!',
     'result.retry': 'Retry',
     'result.toTitle': 'Title',
 
     'over.title': 'GAME OVER',
-    'over.revive': '💫 Revive at Checkpoint',
+    'over.revive': 'Revive at Checkpoint',
 
     'pause.title': 'Paused',
     'pause.resume': 'Resume',

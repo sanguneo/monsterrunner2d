@@ -7,7 +7,7 @@ import { t, getLocale, setLocale, onLocaleChange } from '../data/i18n';
 import type { Locale } from '../data/i18n';
 import { WORLDS, worldImage, rewardImage, TITLE_BG_IMAGE } from '../data/worlds';
 import type { Game } from '../core/Game';
-import { uiIcon } from './icons';
+import { uiIcon, worldThemeIcon } from './icons';
 
 export interface ResultData {
   level: number;
@@ -140,11 +140,11 @@ export class Screens {
         <div class="game-logo">${uiIcon('ghost', 'game-logo-img')}</div>
         <h1 class="game-title">${t('title.name')}</h1>
         <p class="game-subtitle">${t('title.subtitle')}</p>
-        ${high > 0 ? `<p class="highscore">${uiIcon('trophy')} ${this.game.world.emoji} ${t('title.highscore')}: ${high.toLocaleString()}</p>` : ''}
+        ${high > 0 ? `<p class="highscore">${uiIcon('trophy')} ${worldThemeIcon(this.game.world.id)} ${t('title.highscore')}: ${high.toLocaleString()}</p>` : ''}
         <div class="world-select">
           <div class="settings-title">${t('title.selectWorld')}</div>
           <div class="world-grid">${worldBtns}</div>
-          <p class="world-name">${this.game.world.emoji} ${t(this.game.world.nameKey)}</p>
+          <p class="world-name">${worldThemeIcon(this.game.world.id)} ${t(this.game.world.nameKey)}</p>
         </div>
         <button class="btn btn-primary" data-act="start">${t('title.start')}</button>
         <button class="btn" data-act="tutorial">${t('title.tutorialReplay')}</button>
@@ -222,8 +222,8 @@ export class Screens {
       <div class="screen reward-screen" data-act="continue">
         <h2 class="reward-title">${t('reward.title')}</h2>
         <img class="reward-img" src="${rewardImage(data.itemId)}" alt="${t(data.nameKey)}" />
-        <p class="reward-text">${data.emoji} ${t(data.nameKey)} ${t('reward.got')}</p>
-        ${data.unlockedSkillKey ? `<p class="reward-text">${t('reward.skillUnlocked')} — ${t(data.unlockedSkillKey)}</p>` : ''}
+        <p class="reward-text">${t(data.nameKey)} ${t('reward.got')}</p>
+        ${data.unlockedSkillKey ? `<p class="reward-text">${uiIcon('sparkle')} ${t('reward.skillUnlocked')} — ${t(data.unlockedSkillKey)}</p>` : ''}
         <p class="reward-tap">${t('reward.tap')}</p>
       </div>
     `;
@@ -241,7 +241,7 @@ export class Screens {
       <div class="screen stage-intro" data-act="go">
         <div class="stage-label">${t('stage.world')} ${worldIdx + 1}</div>
         <img class="stage-img" src="${worldImage(worldIdx)}" alt="${t(w.nameKey)}" />
-        <h2 class="stage-name">${w.emoji} ${t(w.nameKey)}</h2>
+        <h2 class="stage-name">${worldThemeIcon(w.id)} ${t(w.nameKey)}</h2>
         <p class="stage-tap">${t('stage.tapToStart')}</p>
       </div>
     `;
@@ -265,9 +265,9 @@ export class Screens {
     this.currentData = data;
     this.overlay.innerHTML = `
       <div class="screen result-screen">
-        <h2>🎉 ${t('result.title')}</h2>
-        ${data.isAllClear ? `<p class="master-title">${t('result.master')}</p>` : ''}
-        ${data.isNewRecord ? `<p class="new-record">${t('result.newRecord')}</p>` : ''}
+        <h2>${uiIcon('party')} ${t('result.title')}</h2>
+        ${data.isAllClear ? `<p class="master-title">${uiIcon('crown')} ${t('result.master')}</p>` : ''}
+        ${data.isNewRecord ? `<p class="new-record">${uiIcon('party')} ${t('result.newRecord')}</p>` : ''}
         <div class="stat-grid">
           <div class="stat"><span>${t('result.score')}</span><b>${data.score.toLocaleString()}</b></div>
           <div class="stat"><span>${t('result.distance')}</span><b>${Math.floor(data.distance)}m</b></div>
@@ -296,14 +296,14 @@ export class Screens {
     this.currentData = data;
     this.overlay.innerHTML = `
       <div class="screen gameover-screen">
-        <h2>💀 ${t('over.title')}</h2>
+        <h2>${uiIcon('skull')} ${t('over.title')}</h2>
         <div class="stat-grid">
           <div class="stat"><span>${t('result.distance')}</span><b>${Math.floor(data.distance)}m</b></div>
           <div class="stat"><span>${t('result.level')}</span><b>Lv.${data.level}</b></div>
           <div class="stat"><span>${t('result.coins')}</span><b>${uiIcon('coin')} ${data.coins}</b></div>
           <div class="stat"><span>${t('result.score')}</span><b>${data.score.toLocaleString()}</b></div>
         </div>
-        ${data.canRevive ? `<button class="btn btn-primary" data-act="revive">${t('over.revive')}</button>` : ''}
+        ${data.canRevive ? `<button class="btn btn-primary" data-act="revive">${uiIcon('sparkle')} ${t('over.revive')}</button>` : ''}
         <button class="btn ${data.canRevive ? '' : 'btn-primary'}" data-act="retry">${t('result.retry')}</button>
         <button class="btn" data-act="title">${t('result.toTitle')}</button>
       </div>
