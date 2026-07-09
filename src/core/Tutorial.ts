@@ -1,11 +1,11 @@
 // ============================================================
-// 튜토리얼 — 6단계 안전 학습 구간 (§14)
+// 튜토리얼 — 4단계 안전 학습 구간 (§14)
 // 무피해 · 무게임오버 · 무EXP. 대기-성공(wait-for-success) 방식.
+// v3.1: 점프/슬라이드 학습 제거 — 줄 이동(회피)만 학습한다.
 // ============================================================
 
 import { CONFIG } from '../data/config';
 import type { Game } from './Game';
-import type { Pickup } from '../entities/Pickup';
 import type { Obstacle } from '../entities/Obstacle';
 import type { Monster } from '../entities/Monster';
 
@@ -18,11 +18,9 @@ export class Tutorial {
   private phase: 'setup' | 'wait' | 'outro' = 'setup';
   private timer = 0;
 
-  private targetPickup: Pickup | null = null;
   private targetObstacle: Obstacle | null = null;
   private targetMonster: Monster | null = null;
   private actionSucceeded = false;
-  private retrySide = 1; // 레인 이동 학습: 좌우 번갈아
 
   constructor(private game: Game) {}
 
@@ -69,31 +67,10 @@ export class Tutorial {
         break;
 
       case 'lane': {
-        const pk = this.targetPickup;
-        if (!pk) break;
-        if (pk.collected) {
-          this.nextStep();
-        } else if (!pk.alive || pk.z < p.z - 1.5) {
-          this.respawn(); // 놓침 — 처벌 없이 반복
-        }
-        break;
-      }
-
-      case 'jump': {
+        // 줄 이동 회피 학습: 막힌 줄에서 벗어나면 성공
         const o = this.targetObstacle;
         if (!o) break;
-        if (Math.abs(p.z - o.z) < 0.7 && p.y > 0.35) this.actionSucceeded = true;
-        if (o.z < p.z - 1.5) {
-          if (this.actionSucceeded) this.nextStep();
-          else this.respawn();
-        }
-        break;
-      }
-
-      case 'slide': {
-        const o = this.targetObstacle;
-        if (!o) break;
-        if (Math.abs(p.z - o.z) < 0.7 && p.sliding) this.actionSucceeded = true;
+        if (p.lane !== o.lane) this.actionSucceeded = true;
         if (o.z < p.z - 1.5) {
           if (this.actionSucceeded) this.nextStep();
           else this.respawn();
@@ -138,23 +115,10 @@ export class Tutorial {
         this.timer = 2.5;
         break;
 
-      case 'lane': {
+      case 'lane':
         game.screens.showTutorialPrompt('tut.lane');
-        let lane = p.lane + this.retrySide;
-        if (lane < 0 || lane > 2) lane = p.lane - this.retrySide;
-        this.retrySide *= -1;
-        this.targetPickup = game.spawnPickup('gem', lane, p.z + 24, 0.9);
-        break;
-      }
-
-      case 'jump':
-        game.screens.showTutorialPrompt('tut.jump');
-        this.targetObstacle = game.spawnObstacle('LOW', p.lane, p.z + 24);
-        break;
-
-      case 'slide':
-        game.screens.showTutorialPrompt('tut.slide');
-        this.targetObstacle = game.spawnObstacle('HIGH', p.lane, p.z + 24);
+        // 플레이어의 현재 줄을 막아 반드시 위/아래로 이동해야 통과한다
+        this.targetObstacle = game.spawnObstacle('BLOCK', p.lane, p.z + 24);
         break;
 
       case 'autofire':

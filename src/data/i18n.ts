@@ -57,9 +57,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'banner.newSkill': '새 스킬 사용 가능!',
 
     'tut.run': '달리기는 저절로 돼요!',
-    'tut.lane': '← → 키 / 좌우로 밀어서 보석을 먹어요!',
-    'tut.jump': '위로! 점프! (↑ 키 / 위로 밀기)',
-    'tut.slide': '아래로! 숙이기! (↓ 키 / 아래로 밀기)',
+    'tut.lane': '위/아래 줄로 이동해서 막힌 줄을 피해요! (↑↓ 키 / 위아래로 밀기)',
     'tut.autofire': '공격은 저절로! 유령을 물리쳐요!',
     'tut.skillAuto': '스킬도 자동이에요! (AUTO 배지를 봐요)',
     'tut.skillManual': 'Q / E 키나 버튼으로 필살기!',
@@ -153,9 +151,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'banner.newSkill': 'New skill ready!',
 
     'tut.run': 'Running is automatic!',
-    'tut.lane': '← → keys / swipe to grab the gem!',
-    'tut.jump': 'Jump! (↑ key / swipe up)',
-    'tut.slide': 'Slide! (↓ key / swipe down)',
+    'tut.lane': 'Move up/down to dodge blocked lanes! (↑↓ keys / swipe up-down)',
     'tut.autofire': 'Attacks are automatic! Beat the ghost!',
     'tut.skillAuto': 'Skills are automatic too! (See the AUTO badge)',
     'tut.skillManual': 'Press Q / E or the buttons for skills!',

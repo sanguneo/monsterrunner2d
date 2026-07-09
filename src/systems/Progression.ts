@@ -2,7 +2,6 @@
 // 성장 — 경험치 → 레벨업 → 능력치 자동 분배 (§10)
 // ============================================================
 
-import * as THREE from 'three';
 import { CONFIG } from '../data/config';
 import { t } from '../data/i18n';
 import type { Game } from '../core/Game';
@@ -31,7 +30,7 @@ export class Progression {
     p.expToNext = CONFIG.progression.expCurve(p.level);
 
     this.game.sound.play('levelUp');
-    this.game.hud.floatTextWorld(p.position.clone().add(new THREE.Vector3(0, 2.2, 0)), t('float.levelup'), 'levelup');
+    this.game.hud.floatTextWorld(p.worldX, p.lane, t('float.levelup'), 'levelup', 2.2);
     this.game.hud.flashScreen('#ffd54a', 0.15);
   }
 }

@@ -1,11 +1,12 @@
 // ============================================================
 // 키보드 + 터치 통합 입력 (§5, §13.2)
 // 입력 버퍼(0.15s) — 소비 측(Player/Combat)이 버퍼에서 꺼내 쓴다.
+// 순수 3줄 닷지: 위/아래 줄 이동만 (v3.1 — 점프/슬라이드 제거)
 // ============================================================
 
 import { CONFIG } from '../data/config';
 
-export type Action = 'left' | 'right' | 'jump' | 'slide' | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'pause';
+export type Action = 'up' | 'down' | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'pause';
 
 interface BufferedAction {
   action: Action;
@@ -72,23 +73,13 @@ export class Input {
   private onKeyDown(e: KeyboardEvent): void {
     if (e.repeat) return;
     switch (e.code) {
-      case 'ArrowLeft':
-      case 'KeyA':
-        this.push('left');
-        break;
-      case 'ArrowRight':
-      case 'KeyD':
-        this.push('right');
-        break;
       case 'ArrowUp':
       case 'KeyW':
-      case 'Space':
-        e.preventDefault();
-        this.push('jump');
+        this.push('up');
         break;
       case 'ArrowDown':
       case 'KeyS':
-        this.push('slide');
+        this.push('down');
         break;
       case 'KeyQ':
         this.push('skill1');
@@ -129,18 +120,14 @@ export class Input {
     const SWIPE_MIN = 24;
 
     if (dist >= SWIPE_MIN) {
-      // 스와이프: 주축 방향 판정
-      if (Math.abs(dx) > Math.abs(dy)) {
-        this.push(dx > 0 ? 'right' : 'left');
-      } else {
-        this.push(dy < 0 ? 'jump' : 'slide');
+      // 스와이프: 수직 방향만 유효 액션(위/아래 줄 이동). 수평 스와이프는 무시.
+      if (Math.abs(dy) >= Math.abs(dx)) {
+        this.push(dy < 0 ? 'up' : 'down');
       }
     } else if (this.now() - this.touchStartTime < 0.35) {
-      // 탭: 레인 터치 (좌 1/3=좌, 우 1/3=우, 중앙=점프)
-      const w = window.innerWidth;
-      if (touch.clientX < w / 3) this.push('left');
-      else if (touch.clientX > (w * 2) / 3) this.push('right');
-      else this.push('jump');
+      // 탭: 화면 상/하 절반 터치 = 위/아래 줄 이동
+      const h = window.innerHeight;
+      this.push(touch.clientY < h / 2 ? 'up' : 'down');
     }
   }
 }

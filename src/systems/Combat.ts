@@ -1,9 +1,9 @@
 // ============================================================
 // 전투 — 자동 사격 + 수동 스킬 + 충돌 (§7, §8, §13.1)
+// v3.1: worldX/lane 축 기반 — 렌더링 라이브러리 의존 제거(2D FX는 Game.render가 그린다).
 // ============================================================
 
-import * as THREE from 'three';
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import { t } from '../data/i18n';
 import { Projectile } from '../entities/Projectile';
 
@@ -11,13 +11,18 @@ import type { Game } from '../core/Game';
 
 export type SkillId = 'blast' | 'dash' | 'rapidFire' | 'healPulse';
 
-interface BlastFx {
-  mesh: THREE.Mesh;
+/** 광역 폭발 2D 이펙트 데이터 — Game.render가 worldToScreenX/laneY로 그린다 (§3.1) */
+export interface BlastFx {
+  worldX: number;
+  lane: number;
+  age: number;
   life: number;
 }
 
-const ringGeo = new THREE.TorusGeometry(1, 0.12, 8, 28);
-const ringMat = new THREE.MeshBasicMaterial({ color: 0xffa726, transparent: true, opacity: 0.9 });
+interface Target {
+  worldX: number;
+  lane: number;
+}
 
 export class Combat {
   /** 잔여 쿨다운(초). 0이면 사용 가능. */
@@ -29,10 +34,12 @@ export class Combat {
     healPulse: CONFIG.skills.pool.healPulse.cooldown,
   };
 
+  /** 광역 폭발 이펙트 목록 — Game.render가 소비(§3.1) */
+  readonly fx: BlastFx[] = [];
+
   private fireTimer = 0;
   private rapidActive = 0; // 연사 폭주 잔여 시간
   private dashReadyIdle = 0; // 자동 대시: 위협 없을 때 대기 시간
-  private fx: BlastFx[] = [];
 
   constructor(private game: Game) {}
 
@@ -41,11 +48,7 @@ export class Combat {
     this.fireTimer = 0;
     this.rapidActive = 0;
     this.dashReadyIdle = 0;
-    this.fx.forEach((f) => {
-      this.game.scene.remove(f.mesh);
-      (f.mesh.material as THREE.Material).dispose(); // clone된 링 머티리얼 해제
-    });
-    this.fx = [];
+    this.fx.length = 0;
   }
 
   update(dt: number): void {
@@ -98,20 +101,16 @@ export class Combat {
     const isCrit = Math.random() < p.critChance;
     const damage = p.attack * (isCrit ? CONFIG.player.critMult : 1);
 
-    const origin = new THREE.Vector3(p.x, p.y + 1.0, p.z + 0.5);
-    const dir = target.clone().sub(origin).normalize();
-    const vel = dir.multiplyScalar(CONFIG.projectiles.playerSpeed);
-    const proj = new Projectile('player', damage, origin, vel, isCrit, CONFIG.projectiles.playerLife);
+    const proj = Projectile.forPlayer(damage, p.worldX + 0.5, target.lane, isCrit);
     game.projectiles.push(proj);
-    game.scene.add(proj.mesh);
     game.sound.play('shoot');
   }
 
-  /** 사정거리 내 가장 가까운 몬스터(또는 보스) 자동 타겟 */
-  private findTarget(): THREE.Vector3 | null {
+  /** 사정거리 내 가장 가까운 몬스터(또는 보스) 자동 타겟 — worldX/lane (§3.1) */
+  private findTarget(): Target | null {
     const game = this.game;
     const p = game.player;
-    let best: THREE.Vector3 | null = null;
+    let best: Target | null = null;
     let bestDist = CONFIG.player.fireRange;
 
     for (const m of game.monsters) {
@@ -119,13 +118,13 @@ export class Combat {
       const d = m.z - p.z;
       if (d < bestDist) {
         bestDist = d;
-        best = m.position.clone();
+        best = { worldX: m.z, lane: m.lane };
       }
     }
     if (game.boss && game.boss.targetable) {
       const d = game.boss.z - p.z;
       if (d < bestDist) {
-        best = game.boss.position.clone().setY(1.5);
+        best = { worldX: game.boss.z, lane: game.boss.currentLane };
       }
     }
     return best;
@@ -145,12 +144,12 @@ export class Combat {
       proj.update(dt);
 
       if (proj.alive && proj.owner === 'player') {
-        // 몬스터 명중 (정상 크기 판정 — §7.1)
+        // 몬스터 명중 — 같은 줄 + worldX 근접 (§7.1)
         for (const m of game.monsters) {
           if (!m.alive) continue;
-          if (proj.position.distanceTo(m.position) < CONFIG.combat.monsterHitRadius) {
+          if (proj.lane === m.lane && Math.abs(proj.worldX - m.z) < CONFIG.combat.monsterHitRadius) {
             proj.alive = false;
-            game.hud.floatTextWorld(m.position.clone(), `${Math.round(proj.damage)}`, proj.isCrit ? 'crit' : 'dmg');
+            game.hud.floatTextWorld(m.z, m.lane, `${Math.round(proj.damage)}`, proj.isCrit ? 'crit' : 'dmg');
             game.sound.play('hitMonster');
             if (m.takeDamage(proj.damage)) game.onMonsterKilled(m);
             break;
@@ -158,32 +157,30 @@ export class Combat {
         }
         // 보스 명중
         if (proj.alive && game.boss && game.boss.targetable) {
-          const bossCenter = game.boss.position.clone().setY(1.5);
-          if (proj.position.distanceTo(bossCenter) < CONFIG.combat.bossHitRadius) {
+          const boss = game.boss;
+          if (proj.lane === boss.currentLane && Math.abs(proj.worldX - boss.z) < CONFIG.combat.bossHitRadius) {
             proj.alive = false;
-            const dealt = game.boss.takeDamage(proj.damage);
+            const dealt = boss.takeDamage(proj.damage);
             if (dealt > 0) {
               // 경직 중 데미지 숫자 확대·노란색 (§9.4)
-              const cls = game.boss.staggered ? 'dmg-weak' : proj.isCrit ? 'crit' : 'dmg';
-              game.hud.floatTextWorld(bossCenter, `${dealt}`, cls);
+              const cls = boss.staggered ? 'dmg-weak' : proj.isCrit ? 'crit' : 'dmg';
+              game.hud.floatTextWorld(boss.z, boss.currentLane, `${dealt}`, cls, 1.5);
             }
           }
         }
       } else if (proj.alive && proj.owner === 'enemy') {
         // 적 투사체(분필) vs 플레이어 — 피격 히트박스 80% (§13.2)
         if (
-          Math.abs(proj.position.x - p.x) < CONFIG.combat.enemyProjHalfX * scale + 0.15 &&
-          Math.abs(proj.position.z - p.z) < CONFIG.combat.enemyProjHalfZ &&
-          p.y < 2.4
+          Math.abs(proj.worldX - p.z) < CONFIG.combat.enemyProjHalfX * scale + 0.15 &&
+          proj.lane === p.lane
         ) {
           proj.alive = false;
           game.damagePlayer(proj.damage);
         }
-        if (proj.position.z < p.z - 4) proj.alive = false;
+        if (proj.worldX < p.z - 4) proj.alive = false;
       }
 
       if (!proj.alive) {
-        game.scene.remove(proj.mesh);
         game.projectiles.splice(i, 1);
       }
     }
@@ -198,14 +195,10 @@ export class Combat {
     const p = game.player;
     const scale = CONFIG.accessibility.hitboxScale;
 
-    // 몬스터 접촉
+    // 몬스터 접촉 — 같은 줄 + worldX 근접 (점프/슬라이드 회피 없음)
     for (const m of game.monsters) {
       if (!m.alive) continue;
-      if (
-        Math.abs(m.x - p.x) < CONFIG.combat.monsterContact * scale &&
-        Math.abs(m.z - p.z) < CONFIG.combat.monsterContact &&
-        p.y < 1.4
-      ) {
+      if (m.lane === p.lane && Math.abs(m.z - p.z) < CONFIG.combat.monsterContact * scale) {
         if (p.dashTimer > 0) continue; // 무적 대시: 관통
         if (game.damagePlayer(m.contactDamage)) {
           m.alive = false; // 접촉한 몬스터는 소멸 (EXP 없음)
@@ -224,14 +217,10 @@ export class Combat {
       }
     }
 
-    // 수집물 획득 (관대한 판정)
+    // 수집물 획득 — 같은 줄 + worldX 관대한 판정
     for (const pk of game.pickups) {
       if (!pk.alive) continue;
-      if (
-        Math.abs(pk.x - p.x) < CONFIG.combat.pickupRadius &&
-        Math.abs(pk.z - p.z) < CONFIG.combat.pickupRadius &&
-        Math.abs(pk.y - (p.y + 0.8)) < 1.3
-      ) {
+      if (pk.lane === p.lane && Math.abs(pk.z - p.z) < CONFIG.combat.pickupRadius) {
         pk.alive = false;
         game.onPickupCollected(pk);
       }
@@ -268,7 +257,7 @@ export class Combat {
       if (!m.alive) continue;
       if (m.z > p.z - 2 && m.z < p.z + range) {
         hitAny = true;
-        game.hud.floatTextWorld(m.position.clone(), `${Math.round(damage)}`, 'crit');
+        game.hud.floatTextWorld(m.z, m.lane, `${Math.round(damage)}`, 'crit');
         if (m.takeDamage(damage)) game.onMonsterKilled(m);
       }
     }
@@ -277,9 +266,11 @@ export class Combat {
       if (dealt > 0) {
         hitAny = true;
         game.hud.floatTextWorld(
-          game.boss.position.clone().setY(2),
+          game.boss.z,
+          game.boss.currentLane,
           `${dealt}`,
           game.boss.staggered ? 'dmg-weak' : 'crit',
+          2,
         );
       }
     }
@@ -313,7 +304,7 @@ export class Combat {
   private castHealPulse(): boolean {
     const game = this.game;
     game.player.heal(CONFIG.skills.pool.healPulse.heal);
-    game.hud.floatTextWorld(game.player.position.clone(), t('float.heal'), 'heal');
+    game.hud.floatTextWorld(game.player.worldX, game.player.lane, t('float.heal'), 'heal');
     // 주변 잡몹 약한 넉백
     for (const m of game.monsters) {
       if (m.alive && Math.abs(m.z - game.player.z) < 6) m.z += 3;
@@ -364,29 +355,9 @@ export class Combat {
     } else {
       this.dashReadyIdle = 0;
     }
-
-    this.autoJumpPit();
   }
 
-  /**
-   * 자동 점프 보조 — 전방 PIT(구덩이, 데미지 30·점프만 회피)를 자동 점프로 넘긴다.
-   * 대시가 쿨일 때도 무료로 회피 가능. 어린이 방치 플레이 안전망 (검토의견 §4).
-   */
-  private autoJumpPit(): void {
-    const p = this.game.player;
-    if (p.airborne || p.dashTimer > 0) return;
-    const lookAhead = Math.max(this.game.runSpeed, 8) * CONFIG.skills.autoDashLookAhead;
-    for (const o of this.game.obstacles) {
-      if (!o.alive || o.hitDone || o.type !== 'PIT' || o.lane !== p.lane) continue;
-      const d = o.z - p.z;
-      if (d > 0.3 && d < lookAhead) {
-        p.tryAction('jump');
-        return;
-      }
-    }
-  }
-
-  /** 전방 회피 불가 위협 감지 (자동 대시 트리거) */
+  /** 전방 회피 불가 위협 감지 (자동 대시 트리거) — 같은 줄 장애물/적 투사체 근접 */
   private detectImminentThreat(): boolean {
     const game = this.game;
     const p = game.player;
@@ -402,8 +373,8 @@ export class Combat {
     // 적 투사체 접근
     for (const proj of game.projectiles) {
       if (proj.owner !== 'enemy') continue;
-      if (Math.abs(proj.position.x - laneX(p.lane)) < 1.0) {
-        const d = proj.position.z - p.z;
+      if (proj.lane === p.lane) {
+        const d = proj.worldX - p.z;
         if (d > 0 && d < 5) return true;
       }
     }
@@ -416,24 +387,14 @@ export class Combat {
 
   private spawnBlastFx(): void {
     const p = this.game.player;
-    const mesh = new THREE.Mesh(ringGeo, ringMat.clone());
-    mesh.position.set(p.x, 1.0, p.z + 2);
-    mesh.rotation.y = Math.PI / 2;
-    this.game.scene.add(mesh);
-    this.fx.push({ mesh, life: 0.45 });
+    this.fx.push({ worldX: p.worldX + 2, lane: p.lane, age: 0, life: 0.45 });
   }
 
   private updateFx(dt: number): void {
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
-      f.life -= dt;
-      f.mesh.scale.addScalar(dt * 22);
-      (f.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, f.life / 0.45);
-      if (f.life <= 0) {
-        this.game.scene.remove(f.mesh);
-        (f.mesh.material as THREE.Material).dispose(); // clone된 링 머티리얼 해제
-        this.fx.splice(i, 1);
-      }
+      f.age += dt;
+      if (f.age >= f.life) this.fx.splice(i, 1);
     }
   }
 }

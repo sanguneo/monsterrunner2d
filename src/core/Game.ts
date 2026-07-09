@@ -123,7 +123,7 @@ export class Game {
     this.scene.add(this.player.group);
 
     this.sound = new SoundManager();
-    this.player.sfx = (id) => this.sound.play(id); // 점프/슬라이드/레인이동 효과음 배선
+    this.player.sfx = (id) => this.sound.play(id); // 레인이동 효과음 배선
     this.inventory = new Inventory();
     this.cosmetics = new Cosmetics();
     this.progression = new Progression(this);
@@ -215,6 +215,20 @@ export class Game {
 
       const playerSx = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
       if (onScreen(playerSx)) this.player.draw(ctx, playerSx, laneY(this.player.laneVisual));
+
+      // 광역 폭발 이펙트 — 확산하는 원 (§8.1, Combat이 데이터만 갖고 있고 여기서 그린다)
+      for (const f of this.combat.fx) {
+        const sx = worldToScreenX(f.worldX, cameraCtl.scrollWorldX);
+        if (!onScreen(sx)) continue;
+        const baseY = laneY(f.lane);
+        const t2 = f.age / f.life;
+        const r = 10 + t2 * 90;
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(255,167,38,${Math.max(0, 1 - t2)})`;
+        ctx.lineWidth = 4;
+        ctx.arc(sx, baseY - 18, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     });
 
     renderer.end();
@@ -437,6 +451,7 @@ export class Game {
     }
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const o = this.obstacles[i];
+      if (o.alive) o.update(dt); // MOVER 슬라럼 lane 이동 (§6.1)
       if (!o.alive || o.z < behind) {
         this.scene.remove(o.mesh);
         this.obstacles.splice(i, 1);
@@ -800,11 +815,11 @@ export class Game {
       const [cMin, cMax] = CONFIG.pickups.coinPerKill;
       const coins = cMin + Math.floor(Math.random() * (cMax - cMin + 1));
       this.inventory.addCoins(coins);
-      this.hud.floatTextWorld(m.position.clone(), `${uiIcon('coin')} +${coins}`, 'coin');
+      this.hud.floatTextWorld(m.z, m.lane, `${uiIcon('coin')} +${coins}`, 'coin');
       if (Math.random() < CONFIG.pickups.gemDropChance) {
         this.inventory.addGems(1);
         this.progression.addExp(CONFIG.progression.expReward.gem);
-        this.hud.floatTextWorld(m.position.clone().add(new THREE.Vector3(0, 0.6, 0)), `${uiIcon('gem')} +1`, 'gem');
+        this.hud.floatTextWorld(m.z, m.lane, `${uiIcon('gem')} +1`, 'gem', 1.4);
       }
     }
   }
@@ -825,12 +840,12 @@ export class Game {
         this.inventory.addGems(1);
         this.progression.addExp(CONFIG.progression.expReward.gem);
         this.sound.play('gem');
-        this.hud.floatTextWorld(pk.mesh.position.clone(), `${uiIcon('gem')} +1`, 'gem');
+        this.hud.floatTextWorld(pk.z, pk.lane, `${uiIcon('gem')} +1`, 'gem');
         break;
       case 'heal':
         this.player.heal(CONFIG.pickups.healValue);
         this.sound.play('heal');
-        this.hud.floatTextWorld(pk.mesh.position.clone(), `${uiIcon('heart')} +${CONFIG.pickups.healValue}`, 'heal');
+        this.hud.floatTextWorld(pk.z, pk.lane, `${uiIcon('heart')} +${CONFIG.pickups.healValue}`, 'heal');
         break;
     }
   }

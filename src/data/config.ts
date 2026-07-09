@@ -3,7 +3,7 @@
 // 모든 밸런스 조정은 이 파일에서만 한다.
 // ============================================================
 
-export type PatternId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8' | 'P9' | 'P10';
+export type PatternId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8';
 
 export interface BossPhaseConfig {
   from: number;
@@ -30,9 +30,6 @@ export const CONFIG = {
     speedStart: 12,
     speedMax: 24,
     accel: 0.5,
-    jumpAirTime: 0.7,
-    gravity: -25,
-    slideDuration: 0.6,
     hitInvuln: 0.5,
   },
 
@@ -59,7 +56,6 @@ export const CONFIG = {
     fireInterval: 0.4, // 성장 비대상(고정), '연사 폭주'만 일시 단축
     fireRange: 18,
     moveBonusPerLevel: 0.02,
-    jumpBonusPerLevel: 0.03,
   },
 
   projectiles: { playerSpeed: 40, playerLife: 1.2 },
@@ -69,8 +65,7 @@ export const CONFIG = {
     bossHitRadius: 1.4, // 플레이어 발사체 vs 보스
     monsterContact: 0.9, // 몬스터 접촉 판정(피격 히트박스 스케일 곱)
     pickupRadius: 1.0, // 수집물 관대 판정
-    enemyProjHalfX: 0.8, // 적 투사체 vs 플레이어 X 반폭(스케일 곱 + 0.15)
-    enemyProjHalfZ: 0.7, // (구) Z 반폭 — S4까지 shim
+    enemyProjHalfX: 0.8, // 적 투사체 vs 플레이어 worldX 반폭(스케일 곱 + 0.15)
     enemyProjHalfY: 0.7, // 적 투사체 vs 플레이어 Y(줄축) 반폭
   },
 
@@ -96,12 +91,13 @@ export const CONFIG = {
   },
 
   obstacles: {
-    damage: { LOW: 15, HIGH: 15, PIT: 30, BLOCK: 15, MOVER: 15 },
+    damage: { BLOCK: 15, MOVER: 15 },
     minRecovery: 0.8,
+    moverInterval: 0.7, // MOVER 슬라럼 — 한 줄 이동에 걸리는 시간(초)
     ramp: [
-      { until: 0.3, pool: ['P1', 'P2', 'P3', 'P9'] as PatternId[], interval: 2.5 },
-      { until: 0.7, pool: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P9'] as PatternId[], interval: 1.8 },
-      { until: 1.0, pool: ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'] as PatternId[], interval: 1.2 },
+      { until: 0.3, pool: ['P1', 'P2', 'P5'] as PatternId[], interval: 2.5 },
+      { until: 0.7, pool: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'] as PatternId[], interval: 1.8 },
+      { until: 1.0, pool: ['P2', 'P3', 'P4', 'P6', 'P7', 'P8'] as PatternId[], interval: 1.2 },
     ],
     maxBlockedLanes: 2, // 항상 안전 줄 ≥1 (동시 최대 2줄 점유)
     maxConcurrentThreats: 4,
@@ -124,14 +120,13 @@ export const CONFIG = {
   accessibility: {
     autoSkill: true,
     inputBuffer: 0.15,
-    coyoteTime: 0.12,
     hitboxScale: 0.8, // 플레이어 피격 판정에만 적용(자동 사격 명중 판정은 정상 크기)
     actionInputQueue: 1,
   },
 
   tutorial: {
     enabled: true,
-    steps: ['run', 'lane', 'jump', 'slide', 'autofire', 'skill'] as const,
+    steps: ['run', 'lane', 'autofire', 'skill'] as const,
     noDamage: true,
     waitForSuccess: true,
     skippable: true,

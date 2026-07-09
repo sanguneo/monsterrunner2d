@@ -4,7 +4,7 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG } from '../data/config';
+import { CONFIG, laneX } from '../data/config';
 import type { EnemyProjShape } from '../data/worlds';
 
 const playerGeo = new THREE.SphereGeometry(0.16, 8, 8);
@@ -66,6 +66,16 @@ export class Projectile {
     this.mesh.position.copy(position);
   }
 
+  /**
+   * 플레이어 자동사격 탄 생성 — 대상 줄(lane)로 곧장 스폰해 worldX 축으로만 전진한다 (§7.1, §3.1).
+   * Combat.ts가 THREE 없이 호출할 수 있도록 THREE.Vector3 조립을 이 팩토리에 캡슐화한다.
+   */
+  static forPlayer(damage: number, fromWorldX: number, lane: number, isCrit: boolean): Projectile {
+    const position = new THREE.Vector3(laneX(lane), 1.0, fromWorldX);
+    const velocity = new THREE.Vector3(0, 0, CONFIG.projectiles.playerSpeed);
+    return new Projectile('player', damage, position, velocity, isCrit, CONFIG.projectiles.playerLife);
+  }
+
   update(dt: number): void {
     this.life -= dt;
     if (this.life <= 0) this.alive = false;
@@ -80,6 +90,11 @@ export class Projectile {
     return this.mesh.position;
   }
 
+  /** 2D 렌더/판정용 진행거리(worldX) — 3D 전진값(z)을 그대로 사용 (§3.1) */
+  get worldX(): number {
+    return this.mesh.position.z;
+  }
+
   /** 2D 렌더용 레인 근사값 — 실제 위치(연속 x)를 가장 가까운 레인으로 매핑 (§3.1) */
   get lane(): number {
     const l = Math.round(1 - this.mesh.position.x / CONFIG.lanes.spacing);
@@ -88,8 +103,7 @@ export class Projectile {
 
   /** 2D 드로우 — owner(player=밝은 원 / enemy=ball·rod·shard) + 색 (§3.1) */
   draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
-    const ppu = CONFIG.render.ppu;
-    const cy = baseY - this.mesh.position.y * ppu;
+    const cy = baseY - this.mesh.position.y * CONFIG.render.ppu;
 
     ctx.save();
     ctx.translate(sx, cy);

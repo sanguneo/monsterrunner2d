@@ -1,40 +1,33 @@
 // ============================================================
-// 장애물 — LOW/HIGH/PIT/BLOCK (§6.1)
-// view-logic 분리: 프리미티브 박스/벽, 추후 모델 교체 가능.
+// 장애물 — 줄 블로커 BLOCK/MOVER (§6.1)
+// view-logic 분리: 프리미티브 벽, 추후 모델 교체 가능.
 // ============================================================
 
 import * as THREE from 'three';
 import { CONFIG, laneX } from '../data/config';
 import type { Player } from './Player';
 
-export type ObstacleType = 'LOW' | 'HIGH' | 'PIT' | 'BLOCK';
+export type ObstacleType = 'BLOCK' | 'MOVER';
 
-const lowGeo = new THREE.BoxGeometry(1.7, 0.8, 0.6);
-const lowMat = new THREE.MeshStandardMaterial({ color: 0xb45309 });
-const highGeo = new THREE.BoxGeometry(1.8, 1.2, 0.6);
-const highMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed });
-const pitGeo = new THREE.PlaneGeometry(1.9, 2.4);
-const pitMat = new THREE.MeshBasicMaterial({ color: 0x050308 });
 const blockGeo = new THREE.BoxGeometry(1.9, 3.0, 0.8);
 const blockMat = new THREE.MeshStandardMaterial({ color: 0x57534e });
+const moverGeo = new THREE.BoxGeometry(1.8, 2.6, 0.8);
+const moverMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed });
 
 // 2D draw용 테마 색상 (THREE 머티리얼과 함께 갱신 — applyObstacleTheme 참고)
-let lowColor = 0xb45309;
-let highColor = 0x7c3aed;
 let blockColor = 0x57534e;
+let moverColor = 0x7c3aed;
 
 function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
 }
 
 /** 월드 테마 색상 적용 — 스테이지마다 장애물 색이 달라진다 */
-export function applyObstacleTheme(colors: { obsLow: number; obsHigh: number; obsBlock: number }): void {
-  lowMat.color.setHex(colors.obsLow);
-  highMat.color.setHex(colors.obsHigh);
+export function applyObstacleTheme(colors: { obsHigh: number; obsBlock: number }): void {
   blockMat.color.setHex(colors.obsBlock);
-  lowColor = colors.obsLow;
-  highColor = colors.obsHigh;
+  moverMat.color.setHex(colors.obsHigh);
   blockColor = colors.obsBlock;
+  moverColor = colors.obsHigh;
 }
 
 export class Obstacle {
@@ -42,107 +35,69 @@ export class Obstacle {
   /** 충돌 데미지 중복 방지 */
   hitDone = false;
   readonly mesh: THREE.Mesh;
-  readonly zLen: number;
+  /** worldX(진행축) 판정 두께 */
+  readonly zLen = 0.8;
+
+  /** MOVER 슬라럼 — 다음 줄 이동까지 남은 시간 */
+  private moveTimer: number;
+  private moveDir = 1;
 
   constructor(
     public type: ObstacleType,
     public lane: number,
     public z: number,
   ) {
-    const x = laneX(lane);
-    switch (type) {
-      case 'LOW':
-        this.mesh = new THREE.Mesh(lowGeo, lowMat);
-        this.mesh.position.set(x, 0.4, z);
-        this.zLen = 0.6;
-        break;
-      case 'HIGH':
-        // 머리 위 가로막: y 1.0~2.2 — 슬라이드로 통과
-        this.mesh = new THREE.Mesh(highGeo, highMat);
-        this.mesh.position.set(x, 1.6, z);
-        this.zLen = 0.6;
-        break;
-      case 'PIT':
-        this.mesh = new THREE.Mesh(pitGeo, pitMat);
-        this.mesh.rotation.x = -Math.PI / 2;
-        this.mesh.position.set(x, 0.02, z);
-        this.zLen = 2.4;
-        break;
-      case 'BLOCK':
-        this.mesh = new THREE.Mesh(blockGeo, blockMat);
-        this.mesh.position.set(x, 1.5, z);
-        this.zLen = 0.8;
-        break;
+    this.mesh =
+      type === 'BLOCK' ? new THREE.Mesh(blockGeo, blockMat) : new THREE.Mesh(moverGeo, moverMat);
+    this.mesh.position.set(laneX(lane), 1.5, z);
+    this.moveTimer = CONFIG.obstacles.moverInterval;
+  }
+
+  /** MOVER는 일정 시간마다 인접 줄로 이동(슬라럼). BLOCK은 정적. */
+  update(dt: number): void {
+    if (this.type !== 'MOVER') return;
+    this.moveTimer -= dt;
+    if (this.moveTimer <= 0) {
+      let next = this.lane + this.moveDir;
+      if (next < 0 || next > CONFIG.lanes.count - 1) {
+        this.moveDir *= -1;
+        next = this.lane + this.moveDir;
+      }
+      this.lane = next;
+      this.mesh.position.x = laneX(this.lane);
+      this.moveTimer += CONFIG.obstacles.moverInterval;
     }
   }
 
-  /** 플레이어 피격 판정 (히트박스 80% 축소 적용 — §13.2) */
+  /** 플레이어 피격 판정 — 같은 줄 + worldX 근접(§6.1, 점프/슬라이드 회피 없음) */
   collides(player: Player): boolean {
+    if (this.lane !== player.lane) return false;
     const scale = CONFIG.accessibility.hitboxScale;
-    const halfW = 0.45 * scale;
-    const px = player.x;
-    const pz = player.z;
-    const py = player.y;
-    const pHeight = (player.sliding ? 0.8 : 1.6) * scale;
-
-    if (Math.abs(px - laneX(this.lane)) > 0.85 + halfW) return false;
-    if (Math.abs(pz - this.z) > this.zLen / 2 + 0.4 * scale) return false;
-
-    switch (this.type) {
-      case 'LOW':
-        return py < 0.8; // 발이 허들 위를 못 넘으면 충돌
-      case 'HIGH':
-        return py + pHeight > 1.05; // 슬라이드(0.64)면 통과, 서있거나 점프 중이면 충돌
-      case 'PIT':
-        return py <= 0.05; // 지면에 있으면 추락 데미지
-      case 'BLOCK':
-        return py < 2.6; // 점프로 못 넘는 전체 벽
-    }
+    return Math.abs(player.z - this.z) < (this.zLen / 2 + 0.4) * scale;
   }
 
   get damage(): number {
     return CONFIG.obstacles.damage[this.type];
   }
 
-  /** 2D 드로우 — type별 도형 + 월드 테마 색 (§3.1) */
+  /** 2D 드로우 — BLOCK/MOVER 벽 + 월드 테마 색 (§3.1) */
   draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
     const ppu = CONFIG.render.ppu;
-    switch (this.type) {
-      case 'LOW': {
-        // 낮은 허들 — 발밑에서 위로
-        const w = 1.7 * ppu;
-        const h = 0.8 * ppu;
-        ctx.fillStyle = hex(lowColor);
-        ctx.fillRect(sx - w / 2, baseY - h, w, h);
-        break;
-      }
-      case 'HIGH': {
-        // 머리 위 가로바 — 바닥에서 떠 있음(슬라이드로 통과)
-        const w = 1.8 * ppu;
-        const h = 1.2 * ppu;
-        const bottom = baseY - 1.0 * ppu;
-        ctx.fillStyle = hex(highColor);
-        ctx.fillRect(sx - w / 2, bottom - h, w, h);
-        break;
-      }
-      case 'PIT': {
-        // 어두운 구멍
-        const w = 1.9 * ppu;
-        const hh = 0.4 * ppu;
-        ctx.fillStyle = '#050308';
-        ctx.beginPath();
-        ctx.ellipse(sx, baseY - 4, w / 2, hh / 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-      case 'BLOCK': {
-        // 전체 벽 — 점프로도 못 넘음
-        const w = 1.9 * ppu;
-        const h = 3.0 * ppu;
-        ctx.fillStyle = hex(blockColor);
-        ctx.fillRect(sx - w / 2, baseY - h, w, h);
-        break;
-      }
+    const w = (this.type === 'BLOCK' ? 1.9 : 1.8) * ppu;
+    const h = (this.type === 'BLOCK' ? 3.0 : 2.6) * ppu;
+    ctx.fillStyle = hex(this.type === 'BLOCK' ? blockColor : moverColor);
+    ctx.fillRect(sx - w / 2, baseY - h, w, h);
+    if (this.type === 'MOVER') {
+      // 이동 방향 화살표 힌트
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.beginPath();
+      const ay = baseY - h / 2;
+      const dir = this.moveDir;
+      ctx.moveTo(sx + dir * 10, ay);
+      ctx.lineTo(sx - dir * 6, ay - 8);
+      ctx.lineTo(sx - dir * 6, ay + 8);
+      ctx.closePath();
+      ctx.fill();
     }
   }
 }

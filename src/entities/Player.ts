@@ -1,5 +1,6 @@
 // ============================================================
-// 플레이어 — 레인 이동 / 점프 / 슬라이드 / 성장 스탯 (§5, §10, §13.2)
+// 플레이어 — 3줄 닷지 레인 이동 / 성장 스탯 (§5, §10, §13.2)
+// v3.1: 점프/슬라이드 제거 — 위/아래 줄 이동만으로 회피한다.
 // view: 캡슐 프리미티브 + 망토 어태치먼트 (§3.1, §12)
 // ============================================================
 
@@ -27,16 +28,16 @@ export class Player {
   // --- 위치/동작 상태 ---
   lane = CONFIG.lanes.startIndex;
   x = laneX(CONFIG.lanes.startIndex);
-  y = 0;
+  /**
+   * 항상 0/false 유지되는 레거시 상시값 — 점프/슬라이드가 제거되어 플레이어는 항상 지면(y=0)·비슬라이드 상태다.
+   * Boss.ts의 wave/scream 패턴(구 점프/슬라이드 회피)이 참조하는 shim이며, 해당 패턴의 줄-회피 축 전환은 S5에서 처리한다.
+   */
+  readonly y = 0;
+  readonly sliding = false;
   z = 0;
-  private vy = 0;
-  jumping = false;
-  sliding = false;
-  private slideTimer = 0;
   private laneFrom = laneX(CONFIG.lanes.startIndex);
   private laneT = 1; // 레인 보간 진행도 (1=완료)
   private laneFromIdx = CONFIG.lanes.startIndex; // 2D 세로 보간용 출발 줄 인덱스
-  private lastGroundedAt = 0; // 코요테 타임용
   private queuedAction: Action | null = null; // 액션 중 입력 큐 1개 (§13.2)
 
   // --- 전투/성장 스탯 ---
@@ -133,18 +134,8 @@ export class Player {
     return this.hatMesh ? (this.hatMesh.material as THREE.MeshStandardMaterial).color.getHex() : null;
   }
 
-  get airborne(): boolean {
-    return this.y > 0.01;
-  }
-
   get invulnerable(): boolean {
     return this.invulnTimer > 0 || this.dashTimer > 0;
-  }
-
-  /** 레벨 반영 점프 초기 속도: 체공 0.7s 기준 v0 = |g|*T/2 */
-  private jumpVelocity(): number {
-    const base = (-CONFIG.run.gravity * CONFIG.run.jumpAirTime) / 2;
-    return base * (1 + CONFIG.player.jumpBonusPerLevel * (this.level - 1));
   }
 
   /** 레벨 이동속도 보너스 배율 (§10.1) */
@@ -170,24 +161,6 @@ export class Player {
       this.x = laneX(this.lane);
     }
 
-    // 점프 물리
-    if (this.jumping) {
-      this.vy += CONFIG.run.gravity * dt;
-      this.y += this.vy * dt;
-      if (this.y <= 0) {
-        this.y = 0;
-        this.vy = 0;
-        this.jumping = false;
-      }
-    }
-    if (!this.airborne) this.lastGroundedAt = performance.now() / 1000;
-
-    // 슬라이드 타이머
-    if (this.sliding) {
-      this.slideTimer -= dt;
-      if (this.slideTimer <= 0) this.sliding = false;
-    }
-
     // 액션 종료 시 큐 입력 실행 (§13.2 액션 중 입력 큐 1개)
     if (this.queuedAction && allowControl) {
       const a = this.queuedAction;
@@ -199,7 +172,7 @@ export class Player {
 
   private handleInput(input: Input): void {
     let action: Action | null;
-    while ((action = input.consumeAny(['left', 'right', 'jump', 'slide'])) !== null) {
+    while ((action = input.consumeAny(['up', 'down'])) !== null) {
       if (!this.tryAction(action)) {
         this.queuedAction = action; // 실행 불가 → 1개 큐잉
       }
@@ -209,36 +182,14 @@ export class Player {
   /** @returns 실행 성공 여부 */
   tryAction(action: Action): boolean {
     switch (action) {
-      case 'left':
-        if (this.lane <= 0) return true; // 벽: 무시하되 큐에 남기지 않음
+      case 'up':
+        if (this.lane <= 0) return true; // 맨 위 줄: 무시하되 큐에 남기지 않음
         this.startLaneMove(this.lane - 1);
         return true;
-      case 'right':
-        if (this.lane >= CONFIG.lanes.count - 1) return true;
+      case 'down':
+        if (this.lane >= CONFIG.lanes.count - 1) return true; // 맨 아래 줄
         this.startLaneMove(this.lane + 1);
         return true;
-      case 'jump': {
-        const coyote = performance.now() / 1000 - this.lastGroundedAt <= CONFIG.accessibility.coyoteTime;
-        if (!this.jumping && (!this.airborne || coyote)) {
-          this.jumping = true;
-          this.sliding = false;
-          this.vy = this.jumpVelocity();
-          this.y = Math.max(this.y, 0.001);
-          this.sfx?.('jump');
-          return true;
-        }
-        return false;
-      }
-      case 'slide':
-        if (!this.airborne) {
-          this.sliding = true;
-          this.slideTimer = CONFIG.run.slideDuration;
-          this.sfx?.('slide');
-          return true;
-        }
-        // 공중 슬라이드 입력 → 빠른 낙하 + 착지 시 큐 실행
-        this.vy = Math.min(this.vy, -14);
-        return false;
       default:
         return true;
     }
@@ -280,11 +231,7 @@ export class Player {
     this.laneFrom = this.x;
     this.laneFromIdx = this.lane;
     this.laneT = 1;
-    this.y = 0;
     this.z = 0;
-    this.vy = 0;
-    this.jumping = false;
-    this.sliding = false;
     this.invulnTimer = 0;
     this.dashTimer = 0;
     this.queuedAction = null;
@@ -293,14 +240,9 @@ export class Player {
 
   private updateView(): void {
     this.group.position.set(this.x, this.y, this.z);
-    // 슬라이드: 몸 낮추기
-    const targetScaleY = this.sliding ? 0.45 : 1;
-    this.body.scale.y += (targetScaleY - this.body.scale.y) * 0.4;
-    this.body.position.y = 0.8 * this.body.scale.y;
+    this.body.position.y = 0.8;
     // 달리기 바운스
-    if (!this.airborne && !this.sliding) {
-      this.body.position.y += Math.abs(Math.sin(this.time * 10)) * 0.06;
-    }
+    this.body.position.y += Math.abs(Math.sin(this.time * 10)) * 0.06;
     // 무적/대시 깜빡임
     if (this.dashTimer > 0) {
       this.body.visible = true;
@@ -341,12 +283,9 @@ export class Player {
     // 무적(비대시) 시 점멸 — 대시 중엔 항상 표시
     if (this.dashTimer <= 0 && this.invulnTimer > 0 && Math.floor(this.time * 14) % 2 !== 0) return;
 
-    const ppu = CONFIG.render.ppu;
-    const jumpPx = this.y * ppu;
-    const squish = this.sliding ? 0.55 : 1;
     const w = 32;
-    const h = 50 * squish;
-    const footY = baseY - jumpPx;
+    const h = 50;
+    const footY = baseY;
     const bodyTop = footY - h;
 
     // 그림자

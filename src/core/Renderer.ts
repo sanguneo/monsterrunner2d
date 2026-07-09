@@ -12,6 +12,10 @@ export class Renderer2D {
   private scale = 1;
   private offsetX = 0;
   private offsetY = 0;
+  // CSS(window) 픽셀 기준 스케일/오프셋 — DOM 오버레이(HUD 플로팅 텍스트 등) 좌표 변환용
+  private cssScale = 1;
+  private cssOffsetX = 0;
+  private cssOffsetY = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -48,6 +52,10 @@ export class Renderer2D {
     this.scale = Math.min(this.canvas.width / logicalWidth, this.canvas.height / logicalHeight);
     this.offsetX = (this.canvas.width - logicalWidth * this.scale) / 2;
     this.offsetY = (this.canvas.height - logicalHeight * this.scale) / 2;
+
+    this.cssScale = this.scale / dpr;
+    this.cssOffsetX = this.offsetX / dpr;
+    this.cssOffsetY = this.offsetY / dpr;
   }
 
   /** 클리어 + 레터박스 변환 적용. 이후 ctx는 논리(960x540) 좌표계로 그린다. */
@@ -71,5 +79,13 @@ export class Renderer2D {
     ctx.translate(dx, dy);
     cb();
     ctx.restore();
+  }
+
+  /** 논리(960x540) 좌표 → 창(CSS px) 좌표. DOM 오버레이(HUD 플로팅 텍스트 등) 배치에 사용 (§3.1). */
+  toCssPixel(logicalX: number, logicalY: number): { x: number; y: number } {
+    return {
+      x: this.cssOffsetX + logicalX * this.cssScale,
+      y: this.cssOffsetY + logicalY * this.cssScale,
+    };
   }
 }

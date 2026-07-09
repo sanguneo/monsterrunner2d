@@ -3,7 +3,7 @@
 // DOM 오버레이 기반 (터치/마우스 공용, 세이프존 고려)
 // ============================================================
 
-import * as THREE from 'three';
+import { CONFIG, laneY, worldToScreenX } from '../data/config';
 import { t } from '../data/i18n';
 import type { Game } from '../core/Game';
 import type { SkillId } from '../systems/Combat';
@@ -50,8 +50,6 @@ export class HUD {
   private shade!: HTMLElement;
   private weakPopup!: HTMLElement;
   private banner!: HTMLElement;
-
-  private projVec = new THREE.Vector3();
 
   constructor(private game: Game) {
     this.root = document.getElementById('ui-root')!;
@@ -269,7 +267,7 @@ export class HUD {
       if (boss.staggered) {
         this.weakPopup.hidden = false;
         this.weakPopup.textContent = `▼ ${t('boss.weak')} ▼`;
-        const sp = this.project(boss.position.clone().setY(3.4));
+        const sp = this.projectWorld(boss.z, boss.currentLane, 3.4);
         this.weakPopup.style.left = `${sp.x}px`;
         this.weakPopup.style.top = `${sp.y}px`;
       } else {
@@ -310,17 +308,17 @@ export class HUD {
   // 연출 (플로팅 텍스트 / 플래시 / 셰이드 / 배너)
   // ----------------------------------------------------------
 
-  private project(pos: THREE.Vector3): { x: number; y: number } {
-    this.projVec.copy(pos).project(this.game.cameraCtl.camera);
-    return {
-      x: (this.projVec.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-this.projVec.y * 0.5 + 0.5) * window.innerHeight,
-    };
+  /** worldX/lane(§3.1) → 창(CSS px) 좌표. liftWorldUnits는 기준선(laneY) 위로 띄우는 높이(월드 단위). */
+  private projectWorld(worldX: number, lane: number, liftWorldUnits = 0): { x: number; y: number } {
+    const sx = worldToScreenX(worldX, this.game.cameraCtl.scrollWorldX);
+    const sy = laneY(lane) - liftWorldUnits * CONFIG.render.ppu;
+    return this.game.renderer.toCssPixel(sx, sy);
   }
 
-  floatTextWorld(pos: THREE.Vector3, text: string, cls: string): void {
+  /** 플로팅 텍스트(데미지/획득 등) — worldX/lane 기준으로 배치한다 (§3.1). */
+  floatTextWorld(worldX: number, lane: number, text: string, cls: string, liftWorldUnits = 0.8): void {
     if (this.el.hidden) return;
-    const sp = this.project(pos);
+    const sp = this.projectWorld(worldX, lane, liftWorldUnits);
     const div = document.createElement('div');
     div.className = `floater ${cls}`;
     div.innerHTML = text; // 아이콘 img 포함 가능 (내부 생성 문자열만 사용)
