@@ -15,6 +15,17 @@ export interface BossPhaseConfig {
 export const CONFIG = {
   lanes: { count: 3, spacing: 2.0, moveTime: 0.12, startIndex: 1 },
 
+  // 2D 렌더 파라미터 (§20) — laneSpacingPx는 세로 줄 간격(px)
+  render: {
+    logicalWidth: 960,
+    logicalHeight: 540,
+    ppu: 24, // pixels-per-world-unit
+    playerAnchorX: 0.24, // 플레이어 고정 화면 X 비율
+    trackCenterY: 0.6, // 중간 줄 세로 중심 비율
+    laneSpacingPx: 96, // 줄 간격(화면 Y)
+    pixelRatioMax: 2,
+  },
+
   run: {
     speedStart: 12,
     speedMax: 24,
@@ -59,7 +70,8 @@ export const CONFIG = {
     monsterContact: 0.9, // 몬스터 접촉 판정(피격 히트박스 스케일 곱)
     pickupRadius: 1.0, // 수집물 관대 판정
     enemyProjHalfX: 0.8, // 적 투사체 vs 플레이어 X 반폭(스케일 곱 + 0.15)
-    enemyProjHalfZ: 0.7,
+    enemyProjHalfZ: 0.7, // (구) Z 반폭 — S4까지 shim
+    enemyProjHalfY: 0.7, // 적 투사체 vs 플레이어 Y(줄축) 반폭
   },
 
   progression: {
@@ -84,13 +96,14 @@ export const CONFIG = {
   },
 
   obstacles: {
-    damage: { LOW: 15, HIGH: 15, PIT: 30, BLOCK: 15 },
+    damage: { LOW: 15, HIGH: 15, PIT: 30, BLOCK: 15, MOVER: 15 },
     minRecovery: 0.8,
     ramp: [
       { until: 0.3, pool: ['P1', 'P2', 'P3', 'P9'] as PatternId[], interval: 2.5 },
       { until: 0.7, pool: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P9'] as PatternId[], interval: 1.8 },
       { until: 1.0, pool: ['P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'] as PatternId[], interval: 1.2 },
     ],
+    maxBlockedLanes: 2, // 항상 안전 줄 ≥1 (동시 최대 2줄 점유)
     maxConcurrentThreats: 4,
   },
 
@@ -139,4 +152,20 @@ export const CONFIG = {
 // 레인 0(좌)이 화면 왼쪽에 오도록 +X에 매핑한다.
 export function laneX(lane: number): number {
   return (1 - lane) * CONFIG.lanes.spacing;
+}
+
+// 줄(row) → 화면 기준선 Y. lane 0=위, 1=중간, 2=아래.
+export function laneY(lane: number): number {
+  return (
+    CONFIG.render.trackCenterY * CONFIG.render.logicalHeight +
+    (lane - 1) * CONFIG.render.laneSpacingPx
+  );
+}
+
+// 월드 X → 화면 X. 기준점 SoT = camera.scrollWorldX (follow에서 = player.worldX).
+export function worldToScreenX(worldX: number, scrollWorldX: number): number {
+  return (
+    CONFIG.render.playerAnchorX * CONFIG.render.logicalWidth +
+    (worldX - scrollWorldX) * CONFIG.render.ppu
+  );
 }
