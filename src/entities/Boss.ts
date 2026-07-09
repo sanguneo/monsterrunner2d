@@ -7,7 +7,7 @@
 // v3.1: 모든 회피=줄(lane) 이동 — 위협은 동시 최대 2줄, 안전 줄 항상 ≥1 (§9.1).
 // ============================================================
 
-import { CONFIG } from '../data/config';
+import { CONFIG, laneY, worldToScreenX } from '../data/config';
 import type { BossPhaseConfig } from '../data/config';
 import type { BossDef, PatternDef } from '../data/worlds';
 import type { Game } from '../core/Game';
@@ -682,5 +682,165 @@ export class Boss {
     }
 
     ctx.restore();
+  }
+
+  // ----------------------------------------------------------
+  // 위협 2D 시각화 — 예고(telegraph)와 지속 위협(active)을 안전 줄 판단이
+  // 가능하도록 표시한다 (§9.4 예고 신호 표준(2D)). 판정 로직은 건드리지 않는다.
+  // ----------------------------------------------------------
+
+  /** 대상 레인의 트랙 밴드(가로 전체)를 반투명 색으로 채운다 — 위협 줄 표시 공통 헬퍼. */
+  private drawLaneBand(ctx: CanvasRenderingContext2D, lane: number, alpha: number, color: string): void {
+    const baseY = laneY(lane);
+    const half = CONFIG.render.laneSpacingPx * 0.42;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, baseY - half, CONFIG.render.logicalWidth, half * 2);
+    ctx.restore();
+  }
+
+  /** 대상 레인 하단에 얇은 경고 스트립을 그린다 — 투사체/난사 예고(바닥 마커). */
+  private drawFloorMarker(ctx: CanvasRenderingContext2D, lane: number, alpha: number): void {
+    const baseY = laneY(lane);
+    const half = CONFIG.render.laneSpacingPx * 0.42;
+    const stripH = 8;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ff3333';
+    ctx.fillRect(0, baseY + half - stripH, CONFIG.render.logicalWidth, stripH);
+    ctx.restore();
+  }
+
+  /** 대상 레인에 솟아오르는 벽의 그림자(예고) — 실제 위치와 무관하게 레인 전체를 어둡게 표시. */
+  private drawWallShadow(ctx: CanvasRenderingContext2D, lane: number, alpha: number): void {
+    const baseY = laneY(lane);
+    const half = CONFIG.render.laneSpacingPx * 0.42;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = '#3a0d33';
+    ctx.fillRect(0, baseY - half, CONFIG.render.logicalWidth, half * 2);
+    ctx.strokeStyle = `rgba(190,60,220,${alpha})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, baseY - half, CONFIG.render.logicalWidth, half * 2);
+    ctx.restore();
+  }
+
+  /** 플레이어 화면 위치(앵커) 주변에 음파 링을 그린다 — scream 예고/지속. */
+  private drawScreamRing(ctx: CanvasRenderingContext2D, lane: number, alpha: number, color: string, radius: number): void {
+    const baseY = laneY(lane);
+    const px = CONFIG.render.playerAnchorX * CONFIG.render.logicalWidth;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(px, baseY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** 추적(chase) 대상 레인에 십자선 락온 마커를 그린다. */
+  private drawChaseMarker(ctx: CanvasRenderingContext2D, lane: number, alpha: number): void {
+    const baseY = laneY(lane);
+    const px = CONFIG.render.playerAnchorX * CONFIG.render.logicalWidth;
+    const r = 16;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#ff2222';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(px, baseY, r, 0, Math.PI * 2);
+    ctx.moveTo(px - r - 6, baseY);
+    ctx.lineTo(px - r + 4, baseY);
+    ctx.moveTo(px + r - 4, baseY);
+    ctx.lineTo(px + r + 6, baseY);
+    ctx.moveTo(px, baseY - r - 6);
+    ctx.lineTo(px, baseY - r + 4);
+    ctx.moveTo(px, baseY + r - 4);
+    ctx.lineTo(px, baseY + r + 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** 현재 예고/발동 중인 패턴 위협을 2D로 그린다 — walls/wave/scream/투사체 예고(§9.4). */
+  drawHazards(ctx: CanvasRenderingContext2D, scrollWorldX: number): void {
+    if (this.dead) return;
+    const def = this.patternDef(this.currentPattern);
+
+    // 임박도: telegraph 잔여 시간이 줄어들수록 점멸이 빨라진다 (예고 신호 표준 — 임박도 표현).
+    const urgencyPulse = 0.35 + Math.abs(Math.sin(this.bobT * (6 + 10 / Math.max(this.timer, 0.05)))) * 0.55;
+
+    if (this.state === 'telegraph' && def) {
+      switch (def.type) {
+        case 'projectile':
+        case 'barrage':
+          for (const lane of this.targetLanes) this.drawFloorMarker(ctx, lane, urgencyPulse);
+          break;
+        case 'wave':
+          for (const lane of this.targetLanes) this.drawLaneBand(ctx, lane, urgencyPulse * 0.4, hex(def.color ?? 0xff5555));
+          break;
+        case 'walls':
+          for (const lane of this.targetLanes) this.drawWallShadow(ctx, lane, urgencyPulse);
+          break;
+        case 'scream':
+          for (const lane of this.targetLanes) {
+            this.drawScreamRing(ctx, lane, urgencyPulse, hex(def.color ?? 0xff66aa), 18 + urgencyPulse * 14);
+          }
+          break;
+        case 'chase':
+          this.drawChaseMarker(ctx, this.chaseLane, urgencyPulse);
+          break;
+        case 'rush':
+          this.drawLaneBand(ctx, this.lane, urgencyPulse * 0.4, hex(def.color ?? 0xffaa33));
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (this.state === 'active' && def) {
+      if (def.type === 'wave' && this.waveZ !== null) {
+        const sx = worldToScreenX(this.waveZ, scrollWorldX);
+        const bandW = 34;
+        const color = hex(def.color ?? 0xff5555);
+        for (const lane of this.targetLanes) {
+          const baseY = laneY(lane);
+          const half = CONFIG.render.laneSpacingPx * 0.42;
+          ctx.save();
+          ctx.globalAlpha = 0.75;
+          ctx.fillStyle = color;
+          ctx.fillRect(sx - bandW / 2, baseY - half, bandW, half * 2);
+          ctx.restore();
+        }
+      } else if (def.type === 'scream') {
+        const color = hex(def.color ?? 0xff66aa);
+        for (const lane of this.targetLanes) {
+          this.drawScreamRing(ctx, lane, 0.6, color, 30 + Math.abs(Math.sin(this.bobT * 6)) * 22);
+        }
+      } else if (def.type === 'chase') {
+        this.drawChaseMarker(ctx, this.chaseLane, 0.85 + Math.abs(Math.sin(this.bobT * 12)) * 0.15);
+      } else if (def.type === 'rush') {
+        this.drawLaneBand(ctx, this.lane, 0.22, hex(def.color ?? 0xffaa33));
+      }
+    }
+
+    // 지속 위협(차단 벽)은 패턴 상태(recovery 등)와 무관하게 살아있는 동안 항상 표시한다.
+    for (const w of this.blockWalls) {
+      const elapsed = w.duration - w.timer;
+      const grownFrac = Math.max(0, Math.min(1, elapsed / 0.15));
+      const baseY = laneY(w.lane);
+      const half = CONFIG.render.laneSpacingPx * 0.42;
+      const maxH = half * 1.8 * grownFrac;
+      const anchorX = CONFIG.render.playerAnchorX * CONFIG.render.logicalWidth + CONFIG.render.laneSpacingPx * 2.4;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.35 * grownFrac;
+      ctx.fillStyle = '#9955ff';
+      ctx.fillRect(anchorX - 14, baseY + half - maxH, 28, maxH);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(anchorX - 14, baseY + half - maxH, 28, maxH);
+      ctx.restore();
+    }
   }
 }

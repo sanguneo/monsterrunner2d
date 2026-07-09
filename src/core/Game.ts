@@ -211,6 +211,8 @@ export class Game {
       if (this.boss) {
         const bossSx = worldToScreenX(this.boss.worldX, cameraCtl.scrollWorldX);
         if (onScreen(bossSx)) this.boss.draw(ctx, bossSx, laneY(this.boss.currentLane));
+        // 보스 위협 2D 예고/지속 위협(walls/wave/scream/투사체 예고) — boss 본체 화면 이탈 여부와 무관하게 그린다 (§9.4)
+        this.boss.drawHazards(ctx, cameraCtl.scrollWorldX);
       }
 
       const playerSx = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
