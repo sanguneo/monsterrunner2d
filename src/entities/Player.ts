@@ -35,6 +35,7 @@ export class Player {
   private slideTimer = 0;
   private laneFrom = laneX(CONFIG.lanes.startIndex);
   private laneT = 1; // 레인 보간 진행도 (1=완료)
+  private laneFromIdx = CONFIG.lanes.startIndex; // 2D 세로 보간용 출발 줄 인덱스
   private lastGroundedAt = 0; // 코요테 타임용
   private queuedAction: Action | null = null; // 액션 중 입력 큐 1개 (§13.2)
 
@@ -245,6 +246,7 @@ export class Player {
 
   private startLaneMove(target: number): void {
     this.laneFrom = this.x;
+    this.laneFromIdx = this.lane;
     this.lane = target;
     this.laneT = 0;
     this.sfx?.('laneMove');
@@ -276,6 +278,7 @@ export class Player {
     this.lane = CONFIG.lanes.startIndex;
     this.x = laneX(this.lane);
     this.laneFrom = this.x;
+    this.laneFromIdx = this.lane;
     this.laneT = 1;
     this.y = 0;
     this.z = 0;
@@ -321,6 +324,13 @@ export class Player {
   /** 2D 렌더용 진행거리(worldX) — 현행 3D 전진값(z)을 그대로 사용 (§3.1) */
   get worldX(): number {
     return this.z;
+  }
+
+  /** 2D 렌더용 연속 줄 값(세로 보간, §3.1/§4 0.12s smoothstep). laneY(laneVisual)로 사용. */
+  get laneVisual(): number {
+    if (this.laneT >= 1) return this.lane;
+    const s = this.laneT * this.laneT * (3 - 2 * this.laneT);
+    return this.laneFromIdx + (this.lane - this.laneFromIdx) * s;
   }
 
   /**

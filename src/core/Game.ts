@@ -214,7 +214,7 @@ export class Game {
       }
 
       const playerSx = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
-      if (onScreen(playerSx)) this.player.draw(ctx, playerSx, laneY(this.player.lane));
+      if (onScreen(playerSx)) this.player.draw(ctx, playerSx, laneY(this.player.laneVisual));
     });
 
     renderer.end();
