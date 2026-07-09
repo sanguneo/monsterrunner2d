@@ -4,12 +4,12 @@
 // 모든 보스는 data/worlds.ts의 BossDef(패턴/페이즈/외형)로 구동된다.
 // 패턴 타입: projectile / wave / walls / summon / teleport / scream
 // 큐 항목 'a+b'는 연계(첫 패턴 종료 즉시 다음 발동).
+// v3.1: 모든 회피=줄(lane) 이동 — 위협은 동시 최대 2줄, 안전 줄 항상 ≥1 (§9.1).
 // ============================================================
 
-import * as THREE from 'three';
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import type { BossPhaseConfig } from '../data/config';
-import type { BossDef, BossPartDef, PatternDef } from '../data/worlds';
+import type { BossDef, PatternDef } from '../data/worlds';
 import type { Game } from '../core/Game';
 import { pickThreatLanes } from '../core/rules';
 
@@ -17,35 +17,11 @@ type BossState =
   'intro' | 'gap' | 'telegraph' | 'active' | 'recovery' | 'stagger' | 'vanish' | 'reappear' | 'phasechange' | 'dead';
 
 interface BlockWall {
-  mesh: THREE.Mesh;
   lane: number;
   timer: number;
   duration: number;
   damage: number;
   hitDone: boolean; // 벽당 1회 피해 (BLOCK 장애물과 동일 — 무한 드레인 방지)
-}
-
-const markerGeo = new THREE.PlaneGeometry(1.8, 10);
-const wallGeo = new THREE.BoxGeometry(1.8, 3.2, 1.0);
-const waveGeo = new THREE.BoxGeometry(CONFIG.lanes.spacing * 3 + 1.5, 0.5, 0.8);
-const burstGeo = new THREE.RingGeometry(0.3, 0.55, 22);
-
-const wallMatCache = new Map<number, THREE.MeshStandardMaterial>();
-function wallMaterial(color: number): THREE.MeshStandardMaterial {
-  let m = wallMatCache.get(color);
-  if (!m) {
-    m = new THREE.MeshStandardMaterial({ color, emissive: 0x1a1a22 });
-    wallMatCache.set(color, m);
-  }
-  return m;
-}
-
-/** 메시의 GPU 리소스 해제. sharedGeo=true면 지오메트리는 공유본이므로 건드리지 않는다. */
-function disposeMesh(mesh: THREE.Mesh, sharedGeo = false): void {
-  if (!sharedGeo) mesh.geometry.dispose();
-  const mat = mesh.material;
-  if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-  else mat.dispose();
 }
 
 function hex(n: number): string {
@@ -81,12 +57,11 @@ export class Boss {
   private invulnTimer = 0;
   private defeatNotified = false;
 
-  // 패턴 런타임
-  private wave: THREE.Mesh | null = null;
+  // 패턴 런타임 (모두 스칼라 — THREE 비의존)
+  private waveZ: number | null = null; // 파동의 현재 worldX(z) — null이면 비활성
   private waveCrossed = false;
   private blockWalls: BlockWall[] = [];
-  private screamSlid = false;
-  private summonRing: THREE.Mesh | null = null;
+  private screamHit = false; // active 동안 대상 줄에 있었으면 true → 종료 시 피해
   // barrage(연속 탄막)
   private barrageLeft = 0;
   private barrageTimer = 0;
@@ -95,16 +70,13 @@ export class Boss {
   private chaseLane = 1;
   // rush(돌진)
   private rushHit = false;
-  private fx: { mesh: THREE.Mesh; life: number }[] = [];
 
-  // view
-  readonly group: THREE.Group;
-  private bodyGroup: THREE.Group;
-  private outline: THREE.Mesh;
-  private markers: THREE.Mesh[] = [];
-  private markerMat: THREE.MeshBasicMaterial;
+  // 위치 — worldX(z 스칼라)/lane. 2D 렌더는 Game.render가 worldToScreenX(worldX,scroll)/laneY(currentLane)로 sx/baseY를 계산해 draw에 전달한다.
+  private posZ: number; // 현재 worldX (rush 이동/복귀에 따라 변동)
+  private posY = 3.5; // 시각 바운스/인트로 하강/사망 낙하용 스칼라 높이
+  private bodyVisible = true; // vanish 점멸 반영
 
-  readonly z: number;
+  readonly z: number; // 아레나 고정 worldX(스폰 지점)
 
   constructor(
     def: BossDef,
@@ -113,42 +85,9 @@ export class Boss {
   ) {
     this.def = def;
     this.z = z;
+    this.posZ = z;
     this.hp = def.hp;
     this.maxHp = def.hp;
-
-    this.group = new THREE.Group();
-    this.bodyGroup = this.buildBody(def.visual);
-    this.group.add(this.bodyGroup);
-
-    // 경직(약점) 빨강 윤곽 발광 (§9.4)
-    const outGeo = new THREE.CapsuleGeometry(1.0, 1.4, 6, 12);
-    const outMat = new THREE.MeshBasicMaterial({
-      color: 0xff2222,
-      side: THREE.BackSide,
-      transparent: true,
-      opacity: 0.5,
-    });
-    this.outline = new THREE.Mesh(outGeo, outMat);
-    this.outline.scale.setScalar(1.25);
-    this.outline.position.y = 1.4;
-    this.outline.visible = false;
-    this.group.add(this.outline);
-
-    this.group.position.set(0, 3.5, z);
-
-    this.markerMat = new THREE.MeshBasicMaterial({
-      color: 0xff3333,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
-    });
-    for (let i = 0; i < 3; i++) {
-      const m = new THREE.Mesh(markerGeo, this.markerMat);
-      m.rotation.x = -Math.PI / 2;
-      m.visible = false;
-      this.markers.push(m);
-      game.scene.add(m);
-    }
   }
 
   private get phases(): BossPhaseConfig[] {
@@ -180,8 +119,9 @@ export class Boss {
     return !this.dead && this.state !== 'vanish' && this.state !== 'intro';
   }
 
-  get position(): THREE.Vector3 {
-    return this.group.position;
+  /** 2D 렌더용 현재 worldX(z) — Game.render가 worldToScreenX(worldX, scroll)로 사용 (§3.1) */
+  get worldX(): number {
+    return this.posZ;
   }
 
   /** 2D 렌더용 현재 레인(정수) — baseY = laneY(currentLane) 계산에 사용 (§3.1) */
@@ -195,44 +135,6 @@ export class Boss {
 
   private patternDef(id: string): PatternDef | null {
     return this.def.patterns[id] ?? null;
-  }
-
-  private buildBody(parts: BossPartDef[]): THREE.Group {
-    const g = new THREE.Group();
-    for (const p of parts) {
-      let geo: THREE.BufferGeometry;
-      switch (p.geo) {
-        case 'box':
-          geo = new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]);
-          break;
-        case 'sphere':
-          geo = new THREE.SphereGeometry(p.size[0], 14, 12);
-          break;
-        case 'capsule':
-          geo = new THREE.CapsuleGeometry(p.size[0], p.size[1], 6, 12);
-          break;
-        case 'cone':
-          geo = new THREE.ConeGeometry(p.size[0], p.size[1], 10);
-          break;
-        case 'cylinder':
-          geo = new THREE.CylinderGeometry(p.size[0], p.size[1], p.size[2], 12);
-          break;
-        case 'ico':
-          geo = new THREE.IcosahedronGeometry(p.size[0], 0);
-          break;
-      }
-      const mat = new THREE.MeshStandardMaterial({
-        color: p.color,
-        emissive: p.emissive ?? 0x111111,
-        transparent: p.opacity !== undefined,
-        opacity: p.opacity ?? 1,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(...p.pos);
-      if (p.scale) mesh.scale.set(...p.scale);
-      g.add(mesh);
-    }
-    return g;
   }
 
   // ----------------------------------------------------------
@@ -265,12 +167,10 @@ export class Boss {
       this.invulnTimer = CONFIG.phaseTransition.invuln;
       this.qPos = 0;
       this.chain = [];
-      this.clearMarkers();
-      this.clearSummonRing();
-      // 진행 중이던 위험요소 정리 — 파동/차단벽이 화면에 고아로 남는 것 방지
+      // 진행 중이던 위험요소 정리 — 파동/차단벽이 남는 것 방지
       // (패턴 큐 리셋과 함께 위험도 리셋, 돌진 중이었다면 제자리 복귀 포함)
       this.clearHazards();
-      this.bodyGroup.visible = true; // vanish 중 전환 대비
+      this.bodyVisible = true; // vanish 중 전환 대비
       this.game.hud.setShade(0); // scream 중 전환 대비
       this.state = 'phasechange';
       this.timer = 0.8;
@@ -288,8 +188,6 @@ export class Boss {
     this.dead = true;
     this.state = 'dead';
     this.timer = 1.4;
-    this.clearMarkers();
-    this.clearSummonRing();
     this.clearHazards();
     this.game.hud.setShade(0);
     this.game.sound.play('bossDefeat');
@@ -303,18 +201,15 @@ export class Boss {
     this.bobT += dt;
     if (this.invulnTimer > 0) this.invulnTimer -= dt;
 
-    const targetX = laneX(this.lane);
-    this.group.position.x += (targetX - this.group.position.x) * Math.min(1, dt * 8);
     if (this.state !== 'intro' && this.state !== 'dead') {
-      this.group.position.y += (Math.sin(this.bobT * 2) * 0.15 + 0.2 - this.group.position.y) * dt * 3;
+      this.posY += (Math.sin(this.bobT * 2) * 0.15 + 0.2 - this.posY) * dt * 3;
     }
 
     this.updateHazards(dt);
-    this.updateOutline();
 
     switch (this.state) {
       case 'intro':
-        this.group.position.y = Math.max(0.2, this.group.position.y - dt * 2.2);
+        this.posY = Math.max(0.2, this.posY - dt * 2.2);
         this.timer -= dt;
         if (this.timer <= 0) this.enterGap(0.6);
         break;
@@ -327,16 +222,10 @@ export class Boss {
 
       case 'telegraph': {
         this.timer -= dt;
-        this.pulseMarkers();
         const tDef = this.patternDef(this.currentPattern);
         if (tDef?.type === 'scream') {
           this.game.hud.setShade(0.25);
           if (Math.random() < dt * 8) this.game.cameraCtl.shake(0.06, 0.1);
-        }
-        // chase: 예고 동안 마커가 플레이어 레인을 따라온다
-        if (tDef?.type === 'chase' && this.markers[0].visible) {
-          const targetX = laneX(this.game.player.lane);
-          this.markers[0].position.x += (targetX - this.markers[0].position.x) * Math.min(1, dt * 6);
         }
         if (this.timer <= 0) this.beginActive();
         break;
@@ -360,20 +249,19 @@ export class Boss {
         break;
 
       case 'vanish':
-        this.bodyGroup.visible = Math.floor(this.bobT * 20) % 2 === 0;
+        this.bodyVisible = Math.floor(this.bobT * 20) % 2 === 0;
         this.timer -= dt;
         if (this.timer <= 0) {
           // 좌/중/우 새 위치 이동 (§9.2 T)
           const lanes = [0, 1, 2].filter((l) => l !== this.lane);
           this.lane = lanes[Math.floor(Math.random() * lanes.length)];
-          this.group.position.x = laneX(this.lane);
           this.state = 'reappear';
           this.timer = this.patternDef(this.currentPattern)?.reappear ?? 0.4;
         }
         break;
 
       case 'reappear':
-        this.bodyGroup.visible = true;
+        this.bodyVisible = true;
         this.timer -= dt;
         if (this.timer <= 0) this.afterPattern(); // 연계가 있으면 즉시 다음 패턴
 
@@ -381,15 +269,7 @@ export class Boss {
 
       case 'dead':
         this.timer -= dt;
-        this.group.position.y -= dt * 0.8;
-        this.bodyGroup.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          const mat = mesh.material as THREE.MeshStandardMaterial | undefined;
-          if (mat && 'opacity' in mat) {
-            mat.transparent = true;
-            mat.opacity = Math.max(0, mat.opacity - dt * 0.8);
-          }
-        });
+        this.posY -= dt * 0.8;
         if (this.timer <= 0 && !this.defeatNotified) {
           this.defeatNotified = true;
           this.game.onBossDefeated();
@@ -451,37 +331,33 @@ export class Boss {
     switch (def.type) {
       case 'projectile':
         this.targetLanes = this.pickLanes(player.lane, def.lanes ?? 1);
-        this.showMarkers(this.targetLanes, def.color ?? 0xff3333);
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 0.6) * teleMult;
         break;
 
       case 'barrage':
-        // 연속 탄막: 전 레인 순차 위협 — 예고는 전 레인 약하게
+        // 연속 탄막: 전 레인 순차 위협 — 예고는 전 레인
         this.targetLanes = [0, 1, 2];
-        this.showMarkers(this.targetLanes, def.color ?? 0xff3333);
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 0.7) * teleMult;
         break;
 
       case 'wave':
-        this.targetLanes = [0, 1, 2];
-        this.showMarkers(this.targetLanes, def.color ?? 0xffb020);
+        // 줄 순차 파동: 2줄 덮고 1줄은 항상 안전 (§9.1 B — 점프 판정 폐지)
+        this.targetLanes = this.pickLanes(player.lane, 2);
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 0.8) * teleMult;
         break;
 
       case 'walls':
         this.targetLanes = this.pickLanes(player.lane, def.lanes ?? 1);
-        this.showMarkers(this.targetLanes, def.color ?? 0x3b1052); // 그림자 짙어짐
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 0.7) * teleMult;
         break;
 
       case 'chase':
-        // 추적 강타: 마커가 플레이어를 따라옴 (telegraph 동안)
+        // 추적 강타: 락 직전까지 플레이어 줄을 계속 추적
         this.chaseLane = player.lane;
-        this.showMarkers([player.lane], def.color ?? 0xfde047);
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 1.2) * teleMult;
         break;
@@ -489,29 +365,21 @@ export class Boss {
       case 'rush':
         // 돌진: 보스가 플레이어 레인으로 이동 후 예고
         this.lane = player.lane;
-        this.showMarkers([player.lane], def.color ?? 0xff5533);
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 0.85) * teleMult;
         break;
 
-      case 'summon': {
+      case 'summon':
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 1.0) * teleMult;
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(0.3, 0.5, 24),
-          new THREE.MeshBasicMaterial({ color: 0x9d4edd, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
-        );
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(this.group.position.x, 0.05, this.z - 3);
-        this.game.scene.add(ring);
-        this.summonRing = ring;
         break;
-      }
 
       case 'scream':
+        // 자동사격 봉인(active) + 대상 줄(1~2) 음파 — 안전 줄로 회피 (§9.2 S — 슬라이드 판정 폐지)
+        this.targetLanes = this.pickLanes(player.lane, def.lanes ?? 2);
+        this.screamHit = false;
         this.state = 'telegraph';
         this.timer = (def.telegraph ?? 1.0) * teleMult;
-        this.screamSlid = false;
         this.game.sound.play('scream');
         break;
     }
@@ -526,7 +394,6 @@ export class Boss {
     const def = this.patternDef(this.currentPattern);
     if (!def) return;
     const player = this.game.player;
-    this.clearMarkers();
 
     switch (def.type) {
       case 'projectile':
@@ -552,26 +419,17 @@ export class Boss {
         break;
       }
 
-      case 'wave': {
-        const mat = new THREE.MeshBasicMaterial({
-          color: def.color ?? 0xffe28a,
-          transparent: true,
-          opacity: 0.85,
-        });
-        this.wave = new THREE.Mesh(waveGeo, mat);
-        this.wave.position.set(0, 0.25, this.z - 1);
-        this.game.scene.add(this.wave);
+      case 'wave':
+        this.waveZ = this.z - 1;
         this.waveCrossed = false;
         this.state = 'active';
         this.timer = 3.0;
         this.game.cameraCtl.shake(0.12, 0.25);
         break;
-      }
 
       case 'chase':
-        // 락: 마커 위치 고정, 잠깐의 마지막 회피 기회
+        // 락: 목표 줄 고정, 잠깐의 마지막 회피 기회
         this.chaseLane = player.lane;
-        this.markers[0].position.x = laneX(this.chaseLane);
         this.state = 'active';
         this.timer = def.lockTime ?? 0.35;
         break;
@@ -584,7 +442,6 @@ export class Boss {
         break;
 
       case 'summon': {
-        this.clearSummonRing();
         const [min, max] = def.count ?? [1, 2];
         const n = min + Math.floor(Math.random() * (max - min + 1));
         const mDef = this.game.world.monsters[def.monsterIdx ?? 2];
@@ -600,11 +457,7 @@ export class Boss {
 
       case 'walls':
         for (const lane of this.targetLanes) {
-          const mesh = new THREE.Mesh(wallGeo, wallMaterial(def.color ?? 0x1c1022));
-          mesh.position.set(laneX(lane), 1.6, player.z + 0.5);
-          this.game.scene.add(mesh);
           this.blockWalls.push({
-            mesh,
             lane,
             timer: def.blockDuration ?? 2.0,
             duration: def.blockDuration ?? 2.0,
@@ -634,19 +487,17 @@ export class Boss {
     const player = this.game.player;
 
     if (def.type === 'wave') {
-      if (this.wave) {
-        this.wave.position.z -= (def.waveSpeed ?? 14) * dt;
-        // 통과 시점 판정: 점프 중이면 회피 (§9.1 B)
-        if (!this.waveCrossed && this.wave.position.z <= player.z + 0.4) {
+      if (this.waveZ !== null) {
+        this.waveZ -= (def.waveSpeed ?? 14) * dt;
+        // 통과 시점 판정: 대상 줄에 있으면 피해 (§9.1 B — 안전 줄로 이동해 회피)
+        if (!this.waveCrossed && this.waveZ <= player.z + 0.4) {
           this.waveCrossed = true;
-          if (player.y < 0.35) {
+          if (this.targetLanes.includes(player.lane)) {
             this.game.damagePlayer(def.damage ?? 18);
           }
         }
-        if (this.wave.position.z < player.z - 6) {
-          this.game.scene.remove(this.wave);
-          disposeMesh(this.wave, true);
-          this.wave = null;
+        if (this.waveZ < player.z - 6) {
+          this.waveZ = null;
           // 파동 후 경직 ★ — 주 딜 타이밍
           this.enterStagger((def.stagger ?? 1.2) * this.getMod('staggerMult', 1));
           return;
@@ -654,18 +505,14 @@ export class Boss {
       }
       this.timer -= dt;
       if (this.timer <= 0) {
-        if (this.wave) {
-          this.game.scene.remove(this.wave);
-          disposeMesh(this.wave, true);
-          this.wave = null;
-        }
+        this.waveZ = null;
         this.enterStagger((def.stagger ?? 1.2) * this.getMod('staggerMult', 1));
       }
     } else if (def.type === 'scream') {
-      if (player.sliding) this.screamSlid = true; // 슬라이드 회피 (§9.2 S)
+      if (this.targetLanes.includes(player.lane)) this.screamHit = true; // 대상 줄 체류 (§9.2 S)
       this.timer -= dt;
       if (this.timer <= 0) {
-        if (!this.screamSlid) {
+        if (this.screamHit) {
           this.game.damagePlayer(def.damage ?? 15);
         }
         this.game.hud.setShade(0);
@@ -682,23 +529,18 @@ export class Boss {
           color: def.color,
           shape: def.projShape,
         });
-        this.showMarkers([lane], def.color ?? 0xff3333); // 다음 위협 레인 강조
         this.barrageLeft -= 1;
         this.barrageTimer = def.interval ?? 0.3;
       }
       // 종료 판정은 단일 경로 — 모든 탄 발사 완료 또는 안전 상한 도달
       if ((this.barrageLeft <= 0 && this.barrageTimer <= 0) || this.timer <= 0) {
-        this.clearMarkers();
         this.state = 'recovery';
         this.timer = def.recovery ?? 0.5;
       }
     } else if (def.type === 'chase') {
       // 락 종료 → 강타
-      this.pulseMarkers();
       this.timer -= dt;
       if (this.timer <= 0) {
-        this.clearMarkers();
-        this.spawnBurst(laneX(this.chaseLane), player.z + 0.5, def.color ?? 0xfde047);
         this.game.cameraCtl.shake(0.15, 0.2);
         if (player.lane === this.chaseLane && !player.invulnerable) {
           this.game.damagePlayer(def.damage ?? 20);
@@ -707,39 +549,26 @@ export class Boss {
         this.timer = def.recovery ?? 0.5;
       }
     } else if (def.type === 'rush') {
-      // 보스 본체 돌진 — 레인 회피, 통과 후 복귀 + 긴 경직★
+      // 보스 본체 돌진 — 예고된 줄로 돌진, 레인 회피, 통과 후 복귀 + 긴 경직★
       const speed = def.rushSpeed ?? 26;
-      this.group.position.z -= speed * dt;
-      if (!this.rushHit && this.group.position.z <= player.z + 0.6) {
+      this.posZ -= speed * dt;
+      if (!this.rushHit && this.posZ <= player.z + 0.6) {
         this.rushHit = true;
-        if (Math.abs(player.x - laneX(this.lane)) < 0.95) {
+        if (player.lane === this.lane) {
           this.game.damagePlayer(def.damage ?? 24);
         }
         this.game.cameraCtl.shake(0.14, 0.2);
       }
       this.timer -= dt;
-      if (this.group.position.z < player.z - 6 || this.timer <= 0) {
-        this.group.position.z = this.z; // 제자리 복귀
+      if (this.posZ < player.z - 6 || this.timer <= 0) {
+        this.posZ = this.z; // 제자리 복귀
         this.lane = 1;
-        this.clearMarkers();
         this.enterStagger((def.stagger ?? 1.3) * this.getMod('staggerMult', 1));
       }
     } else {
       this.timer -= dt;
       if (this.timer <= 0) this.afterPattern();
     }
-  }
-
-  /** 강타 지점 폭발 링 이펙트 */
-  private spawnBurst(x: number, z: number, color: number): void {
-    const mesh = new THREE.Mesh(
-      burstGeo,
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide }),
-    );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.06, z);
-    this.game.scene.add(mesh);
-    this.fx.push({ mesh, life: 0.4 });
   }
 
   private enterStagger(duration: number): void {
@@ -749,7 +578,7 @@ export class Boss {
   }
 
   // ----------------------------------------------------------
-  // 지속 위협 (차단 벽) / 시각 효과
+  // 지속 위협 (차단 벽)
   // ----------------------------------------------------------
 
   private updateHazards(dt: number): void {
@@ -757,123 +586,37 @@ export class Boss {
     for (let i = this.blockWalls.length - 1; i >= 0; i--) {
       const w = this.blockWalls[i];
       w.timer -= dt;
-      const grow = Math.min(1, (w.duration - w.timer) * 6);
-      const shrink = Math.min(1, w.timer * 4);
-      w.mesh.scale.y = Math.max(0.05, Math.min(grow, shrink));
-      // 벽이 충분히 솟은 뒤, 같은 레인에 있으면 1회 피해 (z 고정 보스전 — 레인 점유 기반)
+      // 벽이 충분히 솟은 뒤, 같은 레인을 점유 중이면 1회 피해 (§9.1 A — P0: x/근접 대신 줄 점유 판정)
       const grown = w.duration - w.timer >= 0.15;
-      if (!w.hitDone && grown && w.timer > 0.1 && Math.abs(player.x - laneX(w.lane)) < 0.85) {
+      if (!w.hitDone && grown && w.timer > 0.1 && player.lane === w.lane) {
         if (this.game.damagePlayer(w.damage)) w.hitDone = true;
       }
       if (w.timer <= 0) {
-        this.game.scene.remove(w.mesh);
         this.blockWalls.splice(i, 1);
       }
-    }
-
-    if (this.summonRing) {
-      this.summonRing.scale.addScalar(dt * 3);
-      (this.summonRing.material as THREE.MeshBasicMaterial).opacity = Math.max(
-        0.2,
-        0.8 - this.summonRing.scale.x * 0.15,
-      );
-    }
-
-    // 강타 폭발 링
-    for (let i = this.fx.length - 1; i >= 0; i--) {
-      const f = this.fx[i];
-      f.life -= dt;
-      f.mesh.scale.addScalar(dt * 14);
-      (f.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, f.life / 0.4);
-      if (f.life <= 0) {
-        this.game.scene.remove(f.mesh);
-        disposeMesh(f.mesh, true); // burstGeo 공유, 머티리얼만 해제
-        this.fx.splice(i, 1);
-      }
-    }
-  }
-
-  private updateOutline(): void {
-    if (this.staggered) {
-      this.outline.visible = true;
-      const pulse = 0.35 + Math.abs(Math.sin(this.bobT * 8)) * 0.35;
-      (this.outline.material as THREE.MeshBasicMaterial).opacity = pulse;
-      this.outline.scale.setScalar(1.25 + Math.sin(this.bobT * 8) * 0.05);
-    } else {
-      this.outline.visible = false;
-    }
-  }
-
-  private showMarkers(lanes: number[], color: number): void {
-    const player = this.game.player;
-    this.markerMat.color.setHex(color);
-    this.markers.forEach((m, i) => {
-      if (i < lanes.length) {
-        m.visible = true;
-        m.position.set(laneX(lanes[i]), 0.03, player.z + 3.5);
-      } else {
-        m.visible = false;
-      }
-    });
-  }
-
-  private pulseMarkers(): void {
-    this.markerMat.opacity = 0.25 + Math.abs(Math.sin(this.bobT * 10)) * 0.35;
-  }
-
-  private clearMarkers(): void {
-    this.markers.forEach((m) => (m.visible = false));
-  }
-
-  private clearSummonRing(): void {
-    if (this.summonRing) {
-      this.game.scene.remove(this.summonRing);
-      disposeMesh(this.summonRing); // 소환진: 매번 새 지오/머티리얼 → 해제
-      this.summonRing = null;
     }
   }
 
   private clearHazards(): void {
-    if (this.wave) {
-      this.game.scene.remove(this.wave);
-      disposeMesh(this.wave, true); // waveGeo는 공유, 머티리얼만 해제
-      this.wave = null;
-    }
-    // blockWalls: 공유 wallGeo + 캐시 머티리얼 → scene 제거만
-    this.blockWalls.forEach((w) => this.game.scene.remove(w.mesh));
+    this.waveZ = null;
     this.blockWalls = [];
-    this.fx.forEach((f) => {
-      this.game.scene.remove(f.mesh);
-      disposeMesh(f.mesh, true); // burstGeo 공유, 머티리얼만 해제
-    });
-    this.fx = [];
-    this.group.position.z = this.z;
+    this.posZ = this.z;
   }
 
   dispose(): void {
-    this.clearMarkers();
-    this.clearSummonRing();
     this.clearHazards();
-    this.markers.forEach((m) => this.game.scene.remove(m)); // markerGeo/Mat 공유 → 제거만
-    this.markerMat.dispose(); // 인스턴스 전용 머티리얼
-    // 본체·아웃라인은 인스턴스마다 새로 생성 → 지오/머티리얼 해제
-    this.bodyGroup.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) disposeMesh(o as THREE.Mesh);
-    });
-    disposeMesh(this.outline);
-    this.game.scene.remove(this.group);
     this.game.hud.setShade(0);
   }
 
   /**
    * 2D 드로우 — def.visual 파츠를 단순 도형으로 근사 + 경직 시 빨간 외곽 링 (§3.1, §9.4).
-   * sx/baseY는 Game.render가 worldToScreenX(this.position.z, ...)/laneY(this.currentLane)로 계산해 전달한다.
+   * sx/baseY는 Game.render가 worldToScreenX(this.worldX, ...)/laneY(this.currentLane)로 계산해 전달한다.
    */
   draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
-    if (!this.bodyGroup.visible) return; // vanish 점멸 반영
+    if (!this.bodyVisible) return; // vanish 점멸 반영
 
     const ppu = CONFIG.render.ppu;
-    const groundY = baseY - this.group.position.y * ppu;
+    const groundY = baseY - this.posY * ppu;
     const fade = this.dead ? Math.max(0, this.timer / 1.4) : 1;
     if (fade <= 0) return;
 

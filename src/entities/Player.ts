@@ -28,12 +28,6 @@ export class Player {
   // --- 위치/동작 상태 ---
   lane = CONFIG.lanes.startIndex;
   x = laneX(CONFIG.lanes.startIndex);
-  /**
-   * 항상 0/false 유지되는 레거시 상시값 — 점프/슬라이드가 제거되어 플레이어는 항상 지면(y=0)·비슬라이드 상태다.
-   * Boss.ts의 wave/scream 패턴(구 점프/슬라이드 회피)이 참조하는 shim이며, 해당 패턴의 줄-회피 축 전환은 S5에서 처리한다.
-   */
-  readonly y = 0;
-  readonly sliding = false;
   z = 0;
   private laneFrom = laneX(CONFIG.lanes.startIndex);
   private laneT = 1; // 레인 보간 진행도 (1=완료)
@@ -239,7 +233,7 @@ export class Player {
   }
 
   private updateView(): void {
-    this.group.position.set(this.x, this.y, this.z);
+    this.group.position.set(this.x, 0, this.z);
     this.body.position.y = 0.8;
     // 달리기 바운스
     this.body.position.y += Math.abs(Math.sin(this.time * 10)) * 0.06;

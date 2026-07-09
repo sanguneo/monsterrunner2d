@@ -209,7 +209,7 @@ export class Game {
       }
 
       if (this.boss) {
-        const bossSx = worldToScreenX(this.boss.position.z, cameraCtl.scrollWorldX);
+        const bossSx = worldToScreenX(this.boss.worldX, cameraCtl.scrollWorldX);
         if (onScreen(bossSx)) this.boss.draw(ctx, bossSx, laneY(this.boss.currentLane));
       }
 
@@ -528,7 +528,6 @@ export class Game {
         this.disposeBoss();
         const def = next === 'MIDBOSS' ? this.world.midBoss : this.world.finalBoss;
         this.boss = new Boss(def, this, this.player.z + CONFIG.world.arenaBossDistance);
-        this.scene.add(this.boss.group);
         this.hud.showBossBar(
           def.nameKey,
           def.phases.map((p) => p.from),
