@@ -4,7 +4,7 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { laneX } from '../data/config';
+import { CONFIG, laneX } from '../data/config';
 
 export type PickupType = 'coin' | 'gem' | 'heal';
 
@@ -48,5 +48,46 @@ export class Pickup {
   }
   get y(): number {
     return this.mesh.position.y;
+  }
+
+  /** 2D 드로우 — type별 도형(동전/보석/회복), 회전 반영 (§3.1) */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    const ppu = CONFIG.render.ppu;
+    const cy = baseY - this.y * ppu;
+    const spin = this.mesh.rotation.y;
+
+    ctx.save();
+    ctx.translate(sx, cy);
+
+    if (this.type === 'coin') {
+      const rx = Math.max(3, 12 * Math.abs(Math.cos(spin)));
+      ctx.fillStyle = '#ffc83d';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rx, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#7a5500';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (this.type === 'gem') {
+      ctx.rotate(spin * 0.3);
+      ctx.fillStyle = '#3de1ff';
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(9, 0);
+      ctx.lineTo(0, 12);
+      ctx.lineTo(-9, 0);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.moveTo(0, 5);
+      ctx.bezierCurveTo(-12, -8, -4, -14, 0, -4);
+      ctx.bezierCurveTo(4, -14, 12, -8, 0, 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 }

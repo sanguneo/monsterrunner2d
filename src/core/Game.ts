@@ -171,7 +171,7 @@ export class Game {
     requestAnimationFrame(loop);
   }
 
-  /** Canvas 2D 렌더 — 배경/트랙 → (임시) 플레이어 사각형 (§3.1, S2 렌더 골격) */
+  /** Canvas 2D 렌더 — 배경/트랙 → 엔티티(줄 0→2 순서, 간이 깊이 정렬) → 보스 → 플레이어 (§3.1) */
   private render(): void {
     const { renderer, cameraCtl } = this;
     renderer.begin();
@@ -179,13 +179,42 @@ export class Game {
     this.env.draw(ctx, cameraCtl, this.world.theme);
 
     const { dx, dy } = cameraCtl.shakeOffset;
+    const width = CONFIG.render.logicalWidth;
+    const onScreen = (sx: number): boolean => sx >= -80 && sx <= width + 80;
+
     renderer.withShake(dx, dy, () => {
-      const screenX = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
-      const screenY = laneY(this.player.lane);
-      const w = 40;
-      const h = 56;
-      ctx.fillStyle = '#ff7849';
-      ctx.fillRect(screenX - w / 2, screenY - h, w, h);
+      // 뒤 줄(lane=0, 위)부터 앞 줄(lane=2, 아래)까지 순서대로 그린다 (간이 깊이 정렬)
+      for (let lane = 0; lane < CONFIG.lanes.count; lane++) {
+        const baseY = laneY(lane);
+        for (const o of this.obstacles) {
+          if (o.lane !== lane) continue;
+          const sx = worldToScreenX(o.z, cameraCtl.scrollWorldX);
+          if (onScreen(sx)) o.draw(ctx, sx, baseY);
+        }
+        for (const pk of this.pickups) {
+          if (pk.lane !== lane) continue;
+          const sx = worldToScreenX(pk.z, cameraCtl.scrollWorldX);
+          if (onScreen(sx)) pk.draw(ctx, sx, baseY);
+        }
+        for (const m of this.monsters) {
+          if (m.lane !== lane) continue;
+          const sx = worldToScreenX(m.z, cameraCtl.scrollWorldX);
+          if (onScreen(sx)) m.draw(ctx, sx, baseY);
+        }
+        for (const pr of this.projectiles) {
+          if (pr.lane !== lane) continue;
+          const sx = worldToScreenX(pr.position.z, cameraCtl.scrollWorldX);
+          if (onScreen(sx)) pr.draw(ctx, sx, baseY);
+        }
+      }
+
+      if (this.boss) {
+        const bossSx = worldToScreenX(this.boss.position.z, cameraCtl.scrollWorldX);
+        if (onScreen(bossSx)) this.boss.draw(ctx, bossSx, laneY(this.boss.currentLane));
+      }
+
+      const playerSx = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
+      if (onScreen(playerSx)) this.player.draw(ctx, playerSx, laneY(this.player.lane));
     });
 
     renderer.end();

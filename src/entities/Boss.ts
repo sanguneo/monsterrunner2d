@@ -48,6 +48,21 @@ function disposeMesh(mesh: THREE.Mesh, sharedGeo = false): void {
   else mat.dispose();
 }
 
+function hex(n: number): string {
+  return `#${n.toString(16).padStart(6, '0')}`;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
 export class Boss {
   readonly def: BossDef;
   hp: number;
@@ -167,6 +182,11 @@ export class Boss {
 
   get position(): THREE.Vector3 {
     return this.group.position;
+  }
+
+  /** 2D 렌더용 현재 레인(정수) — baseY = laneY(currentLane) 계산에 사용 (§3.1) */
+  get currentLane(): number {
+    return this.lane;
   }
 
   private getMod(name: string, fallback: number): number {
@@ -843,5 +863,81 @@ export class Boss {
     disposeMesh(this.outline);
     this.game.scene.remove(this.group);
     this.game.hud.setShade(0);
+  }
+
+  /**
+   * 2D 드로우 — def.visual 파츠를 단순 도형으로 근사 + 경직 시 빨간 외곽 링 (§3.1, §9.4).
+   * sx/baseY는 Game.render가 worldToScreenX(this.position.z, ...)/laneY(this.currentLane)로 계산해 전달한다.
+   */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    if (!this.bodyGroup.visible) return; // vanish 점멸 반영
+
+    const ppu = CONFIG.render.ppu;
+    const groundY = baseY - this.group.position.y * ppu;
+    const fade = this.dead ? Math.max(0, this.timer / 1.4) : 1;
+    if (fade <= 0) return;
+
+    ctx.save();
+    for (const p of this.def.visual) {
+      const cx = sx + p.pos[0] * ppu;
+      const cy = groundY - p.pos[1] * ppu;
+      ctx.globalAlpha = fade * (p.opacity ?? 1);
+      ctx.fillStyle = hex(p.color);
+      switch (p.geo) {
+        case 'box': {
+          const w = p.size[0] * ppu;
+          const h = p.size[1] * ppu;
+          ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+          break;
+        }
+        case 'sphere':
+        case 'ico': {
+          const r = p.size[0] * ppu;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case 'capsule': {
+          const r = p.size[0] * ppu;
+          const len = p.size[1] * ppu;
+          roundRect(ctx, cx - r, cy - len / 2 - r, r * 2, len + r * 2, r);
+          ctx.fill();
+          break;
+        }
+        case 'cone': {
+          const r = p.size[0] * ppu;
+          const h = p.size[1] * ppu;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - h / 2);
+          ctx.lineTo(cx + r, cy + h / 2);
+          ctx.lineTo(cx - r, cy + h / 2);
+          ctx.closePath();
+          ctx.fill();
+          break;
+        }
+        case 'cylinder': {
+          const rTop = p.size[0] * ppu;
+          const rBot = p.size[1] * ppu;
+          const h = p.size[2] * ppu;
+          const w = Math.max(rTop, rBot) * 2;
+          ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+          break;
+        }
+      }
+    }
+    ctx.globalAlpha = fade;
+
+    // 경직(약점) 빨간 외곽 링 (§9.4)
+    if (this.staggered) {
+      const pulse = 0.35 + Math.abs(Math.sin(this.bobT * 8)) * 0.35;
+      ctx.strokeStyle = `rgba(255,34,34,${pulse})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(sx, groundY - 1.4 * ppu, 1.25 * ppu, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 }

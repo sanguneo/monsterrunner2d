@@ -5,7 +5,7 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { laneX } from '../data/config';
+import { CONFIG, laneX } from '../data/config';
 import type { MonsterDef, MonsterBehavior, MonsterShape } from '../data/worlds';
 
 const eyeGeo = new THREE.SphereGeometry(0.09, 8, 8);
@@ -31,6 +31,21 @@ function materialFor(color: number): THREE.MeshStandardMaterial {
   return m;
 }
 
+function hex(n: number): string {
+  return `#${n.toString(16).padStart(6, '0')}`;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
 export class Monster {
   alive = true;
   hp: number;
@@ -39,6 +54,8 @@ export class Monster {
   readonly speed: number;
   readonly exp: number;
   readonly id: string;
+  readonly shape: MonsterShape;
+  readonly color: number;
   readonly mesh: THREE.Group;
   private body: THREE.Mesh;
   private t = Math.random() * Math.PI * 2;
@@ -56,6 +73,8 @@ export class Monster {
     this.behavior = def.behavior;
     this.speed = def.speed;
     this.exp = def.exp;
+    this.shape = def.shape;
+    this.color = def.color;
 
     this.mesh = new THREE.Group();
     this.body = new THREE.Mesh(shapeGeos[def.shape], materialFor(def.color));
@@ -104,5 +123,86 @@ export class Monster {
   }
   get position(): THREE.Vector3 {
     return this.mesh.position;
+  }
+
+  /** 2D 드로우 — shape별 도형 + color + 빨간 눈 2개 (§3.1) */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    const ppu = CONFIG.render.ppu;
+    const wobble = Math.sin(this.t * 6) * 0.18;
+    const cy = baseY - 0.55 * ppu + Math.sin(this.t * 3) * 3;
+
+    ctx.save();
+    ctx.translate(sx, cy);
+    ctx.rotate(wobble);
+    ctx.fillStyle = hex(this.color);
+
+    switch (this.shape) {
+      case 'box': {
+        const s = 0.85 * ppu;
+        ctx.fillRect(-s / 2, -s / 2, s, s);
+        break;
+      }
+      case 'cone': {
+        const r = 0.45 * ppu;
+        const h = 1.1 * ppu;
+        ctx.beginPath();
+        ctx.moveTo(0, -h / 2);
+        ctx.lineTo(r, h / 2);
+        ctx.lineTo(-r, h / 2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'capsule': {
+        const w = 0.64 * ppu;
+        const h = 1.2 * ppu;
+        roundRect(ctx, -w / 2, -h / 2, w, h, w / 2);
+        ctx.fill();
+        break;
+      }
+      case 'tetra': {
+        const r = 0.62 * ppu;
+        ctx.beginPath();
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 0.87, r * 0.5);
+        ctx.lineTo(-r * 0.87, r * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'spiky': {
+        const r = 0.6 * ppu;
+        const spikes = 6;
+        ctx.beginPath();
+        for (let i = 0; i < spikes * 2; i++) {
+          const a = (Math.PI * i) / spikes;
+          const rad = i % 2 === 0 ? r : r * 0.5;
+          const px = Math.sin(a) * rad;
+          const py = -Math.cos(a) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'sphere':
+      default: {
+        const r = 0.5 * ppu;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+    }
+
+    // 빨간 눈 2개
+    ctx.fillStyle = '#ff1111';
+    ctx.beginPath();
+    ctx.arc(-5, -3, 2.4, 0, Math.PI * 2);
+    ctx.arc(5, -3, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 }

@@ -8,6 +8,21 @@ import { CONFIG, laneX } from '../data/config';
 import type { Action, Input } from '../core/Input';
 import type { SoundId } from '../systems/Sound';
 
+function hex(n: number): string {
+  return `#${n.toString(16).padStart(6, '0')}`;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
 export class Player {
   // --- 위치/동작 상태 ---
   lane = CONFIG.lanes.startIndex;
@@ -36,7 +51,7 @@ export class Player {
   dashTimer = 0; // 무적 대시 잔여 시간
   alive = true;
 
-  // --- view ---
+  // --- view (3D shim — S6까지 유지, 2D 렌더에는 미사용) ---
   readonly group: THREE.Group;
   private body: THREE.Mesh;
   private capeMesh: THREE.Mesh | null = null;
@@ -105,6 +120,16 @@ export class Player {
 
   get hasHat(): boolean {
     return this.hatMesh !== null;
+  }
+
+  /** 망토 색상(hex) — 2D draw용. 미장착이면 null. */
+  get capeColor(): number | null {
+    return this.capeMesh ? (this.capeMesh.material as THREE.MeshStandardMaterial).color.getHex() : null;
+  }
+
+  /** 모자 색상(hex) — 2D draw용. 미장착이면 null. */
+  get hatColor(): number | null {
+    return this.hatMesh ? (this.hatMesh.material as THREE.MeshStandardMaterial).color.getHex() : null;
   }
 
   get airborne(): boolean {
@@ -296,5 +321,70 @@ export class Player {
   /** 2D 렌더용 진행거리(worldX) — 현행 3D 전진값(z)을 그대로 사용 (§3.1) */
   get worldX(): number {
     return this.z;
+  }
+
+  /**
+   * 2D 드로우 — 캡슐형 몸 + 머리 + 얼굴 점 + 그림자. 망토/모자는 있으면 색 도형 부착.
+   * sx/baseY는 Game.render가 worldToScreenX/laneY로 계산해 전달한다 (§3.1).
+   */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    // 무적(비대시) 시 점멸 — 대시 중엔 항상 표시
+    if (this.dashTimer <= 0 && this.invulnTimer > 0 && Math.floor(this.time * 14) % 2 !== 0) return;
+
+    const ppu = CONFIG.render.ppu;
+    const jumpPx = this.y * ppu;
+    const squish = this.sliding ? 0.55 : 1;
+    const w = 32;
+    const h = 50 * squish;
+    const footY = baseY - jumpPx;
+    const bodyTop = footY - h;
+
+    // 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(sx, baseY + 3, w * 0.5, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 망토
+    const capeColor = this.capeColor;
+    if (capeColor !== null) {
+      ctx.fillStyle = hex(capeColor);
+      ctx.beginPath();
+      ctx.moveTo(sx - w * 0.4, bodyTop + h * 0.1);
+      ctx.lineTo(sx + w * 0.4, bodyTop + h * 0.1);
+      ctx.lineTo(sx, footY + 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 몸
+    ctx.fillStyle = this.dashTimer > 0 ? '#5fb6ff' : '#ff7849';
+    roundRect(ctx, sx - w / 2, bodyTop, w, h, w * 0.4);
+    ctx.fill();
+
+    // 머리
+    const headR = w * 0.36;
+    const headCy = bodyTop - headR * 0.6;
+    ctx.beginPath();
+    ctx.arc(sx, headCy, headR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 모자
+    const hatColor = this.hatColor;
+    if (hatColor !== null) {
+      ctx.fillStyle = hex(hatColor);
+      ctx.beginPath();
+      ctx.moveTo(sx - headR * 0.9, headCy - headR * 0.4);
+      ctx.lineTo(sx + headR * 0.9, headCy - headR * 0.4);
+      ctx.lineTo(sx, headCy - headR * 2.1);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 얼굴 점
+    ctx.fillStyle = '#221109';
+    ctx.beginPath();
+    ctx.arc(sx + headR * 0.35, headCy, headR * 0.18, 0, Math.PI * 2);
+    ctx.fill();
   }
 }

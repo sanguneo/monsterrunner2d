@@ -4,6 +4,7 @@
 // ============================================================
 
 import * as THREE from 'three';
+import { CONFIG } from '../data/config';
 import type { EnemyProjShape } from '../data/worlds';
 
 const playerGeo = new THREE.SphereGeometry(0.16, 8, 8);
@@ -27,6 +28,10 @@ function enemyMaterial(color: number): THREE.MeshBasicMaterial {
   return m;
 }
 
+function hex(n: number): string {
+  return `#${n.toString(16).padStart(6, '0')}`;
+}
+
 export interface EnemyProjStyle {
   color?: number;
   shape?: EnemyProjShape;
@@ -36,6 +41,8 @@ export class Projectile {
   alive = true;
   readonly mesh: THREE.Mesh;
   private readonly spin: boolean;
+  private readonly enemyShape: EnemyProjShape;
+  private readonly enemyColor: number;
 
   constructor(
     public owner: 'player' | 'enemy',
@@ -46,13 +53,14 @@ export class Projectile {
     public life = 2.0,
     style: EnemyProjStyle = {},
   ) {
+    this.enemyShape = style.shape ?? 'rod';
+    this.enemyColor = style.color ?? 0xffffff;
     if (owner === 'player') {
       this.mesh = new THREE.Mesh(playerGeo, isCrit ? critMat : playerMat);
       this.spin = false;
     } else {
-      const shape = style.shape ?? 'rod';
-      this.mesh = new THREE.Mesh(enemyGeos[shape], enemyMaterial(style.color ?? 0xffffff));
-      if (shape === 'rod') this.mesh.rotation.x = Math.PI / 2;
+      this.mesh = new THREE.Mesh(enemyGeos[this.enemyShape], enemyMaterial(this.enemyColor));
+      if (this.enemyShape === 'rod') this.mesh.rotation.x = Math.PI / 2;
       this.spin = true;
     }
     this.mesh.position.copy(position);
@@ -70,5 +78,51 @@ export class Projectile {
 
   get position(): THREE.Vector3 {
     return this.mesh.position;
+  }
+
+  /** 2D 렌더용 레인 근사값 — 실제 위치(연속 x)를 가장 가까운 레인으로 매핑 (§3.1) */
+  get lane(): number {
+    const l = Math.round(1 - this.mesh.position.x / CONFIG.lanes.spacing);
+    return Math.min(CONFIG.lanes.count - 1, Math.max(0, l));
+  }
+
+  /** 2D 드로우 — owner(player=밝은 원 / enemy=ball·rod·shard) + 색 (§3.1) */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    const ppu = CONFIG.render.ppu;
+    const cy = baseY - this.mesh.position.y * ppu;
+
+    ctx.save();
+    ctx.translate(sx, cy);
+
+    if (this.owner === 'player') {
+      ctx.fillStyle = this.isCrit ? '#ffe066' : '#7fd6ff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.rotate(this.mesh.rotation.z);
+      ctx.fillStyle = hex(this.enemyColor);
+      switch (this.enemyShape) {
+        case 'ball':
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        case 'rod':
+          ctx.fillRect(-3, -12, 6, 24);
+          break;
+        case 'shard':
+          ctx.beginPath();
+          ctx.moveTo(0, -9);
+          ctx.lineTo(7, 0);
+          ctx.lineTo(0, 9);
+          ctx.lineTo(-7, 0);
+          ctx.closePath();
+          ctx.fill();
+          break;
+      }
+    }
+
+    ctx.restore();
   }
 }

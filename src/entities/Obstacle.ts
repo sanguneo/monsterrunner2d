@@ -18,11 +18,23 @@ const pitMat = new THREE.MeshBasicMaterial({ color: 0x050308 });
 const blockGeo = new THREE.BoxGeometry(1.9, 3.0, 0.8);
 const blockMat = new THREE.MeshStandardMaterial({ color: 0x57534e });
 
+// 2D draw용 테마 색상 (THREE 머티리얼과 함께 갱신 — applyObstacleTheme 참고)
+let lowColor = 0xb45309;
+let highColor = 0x7c3aed;
+let blockColor = 0x57534e;
+
+function hex(n: number): string {
+  return `#${n.toString(16).padStart(6, '0')}`;
+}
+
 /** 월드 테마 색상 적용 — 스테이지마다 장애물 색이 달라진다 */
 export function applyObstacleTheme(colors: { obsLow: number; obsHigh: number; obsBlock: number }): void {
   lowMat.color.setHex(colors.obsLow);
   highMat.color.setHex(colors.obsHigh);
   blockMat.color.setHex(colors.obsBlock);
+  lowColor = colors.obsLow;
+  highColor = colors.obsHigh;
+  blockColor = colors.obsBlock;
 }
 
 export class Obstacle {
@@ -90,5 +102,47 @@ export class Obstacle {
 
   get damage(): number {
     return CONFIG.obstacles.damage[this.type];
+  }
+
+  /** 2D 드로우 — type별 도형 + 월드 테마 색 (§3.1) */
+  draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
+    const ppu = CONFIG.render.ppu;
+    switch (this.type) {
+      case 'LOW': {
+        // 낮은 허들 — 발밑에서 위로
+        const w = 1.7 * ppu;
+        const h = 0.8 * ppu;
+        ctx.fillStyle = hex(lowColor);
+        ctx.fillRect(sx - w / 2, baseY - h, w, h);
+        break;
+      }
+      case 'HIGH': {
+        // 머리 위 가로바 — 바닥에서 떠 있음(슬라이드로 통과)
+        const w = 1.8 * ppu;
+        const h = 1.2 * ppu;
+        const bottom = baseY - 1.0 * ppu;
+        ctx.fillStyle = hex(highColor);
+        ctx.fillRect(sx - w / 2, bottom - h, w, h);
+        break;
+      }
+      case 'PIT': {
+        // 어두운 구멍
+        const w = 1.9 * ppu;
+        const hh = 0.4 * ppu;
+        ctx.fillStyle = '#050308';
+        ctx.beginPath();
+        ctx.ellipse(sx, baseY - 4, w / 2, hh / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'BLOCK': {
+        // 전체 벽 — 점프로도 못 넘음
+        const w = 1.9 * ppu;
+        const h = 3.0 * ppu;
+        ctx.fillStyle = hex(blockColor);
+        ctx.fillRect(sx - w / 2, baseY - h, w, h);
+        break;
+      }
+    }
   }
 }
