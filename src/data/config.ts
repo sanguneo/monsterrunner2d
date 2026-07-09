@@ -31,6 +31,9 @@ export const CONFIG = {
     speedMax: 24,
     accel: 0.5,
     hitInvuln: 0.5,
+    // 점프(§5): 장애물(BLOCK/MOVER)·보스 지면 파동(wave)을 뛰어넘는다. 몬스터·투사체·벽·비명은 줄 이동으로.
+    jumpAirTime: 0.55, // 체공 시간(초)
+    jumpPeak: 2.0, // 최고 hop 높이(월드 단위) — ×ppu(24)=48px < laneSpacingPx(96)이라 인접 줄과 시각 충돌 없음
   },
 
   world: {
@@ -126,7 +129,7 @@ export const CONFIG = {
 
   tutorial: {
     enabled: true,
-    steps: ['run', 'lane', 'autofire', 'skill'] as const,
+    steps: ['run', 'lane', 'jump', 'autofire', 'skill'] as const,
     noDamage: true,
     waitForSuccess: true,
     skippable: true,

@@ -56,8 +56,9 @@ export class Obstacle {
     }
   }
 
-  /** 플레이어 피격 판정 — 같은 줄 + worldX 근접(§6.1, 점프/슬라이드 회피 없음) */
+  /** 플레이어 피격 판정 — 같은 줄 + worldX 근접. 점프 중(airborne)이면 뛰어넘어 회피(§5). */
   collides(player: Player): boolean {
+    if (player.airborne) return false;
     if (this.lane !== player.lane) return false;
     const scale = CONFIG.accessibility.hitboxScale;
     return Math.abs(player.z - this.z) < (this.zLen / 2 + 0.4) * scale;

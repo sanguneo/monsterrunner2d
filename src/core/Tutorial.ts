@@ -78,6 +78,18 @@ export class Tutorial {
         break;
       }
 
+      case 'jump': {
+        // 점프 학습: 막힌 줄을 점프로 뛰어넘으면 성공
+        const o = this.targetObstacle;
+        if (!o) break;
+        if (o.lane === p.lane && p.airborne && Math.abs(o.z - p.z) < 2) this.actionSucceeded = true;
+        if (o.z < p.z - 1.5) {
+          if (this.actionSucceeded) this.nextStep();
+          else this.respawn();
+        }
+        break;
+      }
+
       case 'autofire': {
         const m = this.targetMonster;
         if (!m) break;
@@ -118,6 +130,12 @@ export class Tutorial {
       case 'lane':
         game.screens.showTutorialPrompt('tut.lane');
         // 플레이어의 현재 줄을 막아 반드시 위/아래로 이동해야 통과한다
+        this.targetObstacle = game.spawnObstacle('BLOCK', p.lane, p.z + 24);
+        break;
+
+      case 'jump':
+        game.screens.showTutorialPrompt('tut.jump');
+        // 현재 줄에 벽 — 점프로 뛰어넘어 통과 학습
         this.targetObstacle = game.spawnObstacle('BLOCK', p.lane, p.z + 24);
         break;
 

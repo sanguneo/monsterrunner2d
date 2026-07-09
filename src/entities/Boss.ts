@@ -492,7 +492,7 @@ export class Boss {
         // 통과 시점 판정: 대상 줄에 있으면 피해 (§9.1 B — 안전 줄로 이동해 회피)
         if (!this.waveCrossed && this.waveZ <= player.z + 0.4) {
           this.waveCrossed = true;
-          if (this.targetLanes.includes(player.lane)) {
+          if (this.targetLanes.includes(player.lane) && !player.airborne) {
             this.game.damagePlayer(def.damage ?? 18);
           }
         }

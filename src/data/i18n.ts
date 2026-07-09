@@ -58,6 +58,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
 
     'tut.run': '달리기는 저절로 돼요!',
     'tut.lane': '위/아래 줄로 이동해서 막힌 줄을 피해요! (↑↓ 키 / 위아래로 밀기)',
+    'tut.jump': '장애물은 점프로 뛰어넘어요! (스페이스바 / 화면 탭)',
     'tut.autofire': '공격은 저절로! 유령을 물리쳐요!',
     'tut.skillAuto': '스킬도 자동이에요! (AUTO 배지를 봐요)',
     'tut.skillManual': 'Q / E 키나 버튼으로 필살기!',
@@ -153,6 +154,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'tut.run': 'Running is automatic!',
     'tut.lane': 'Move up/down to dodge blocked lanes! (↑↓ keys / swipe up-down)',
     'tut.autofire': 'Attacks are automatic! Beat the ghost!',
+    'tut.jump': 'Jump over obstacles! (Spacebar / tap the screen)',
     'tut.skillAuto': 'Skills are automatic too! (See the AUTO badge)',
     'tut.skillManual': 'Press Q / E or the buttons for skills!',
     'tut.skip': 'Skip ▶',

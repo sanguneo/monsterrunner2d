@@ -5,6 +5,7 @@
 
 export type SoundId =
   | 'laneMove'
+  | 'jump'
   | 'coin'
   | 'gem'
   | 'heal'

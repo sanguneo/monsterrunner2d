@@ -6,7 +6,7 @@
 
 import { CONFIG } from '../data/config';
 
-export type Action = 'up' | 'down' | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'pause';
+export type Action = 'up' | 'down' | 'jump' | 'skill1' | 'skill2' | 'skill3' | 'skill4' | 'pause';
 
 interface BufferedAction {
   action: Action;
@@ -93,6 +93,10 @@ export class Input {
       case 'KeyF':
         this.push('skill4');
         break;
+      case 'Space':
+      case 'KeyK':
+        this.push('jump');
+        break;
       case 'Escape':
       case 'KeyP':
         this.push('pause');
@@ -125,9 +129,8 @@ export class Input {
         this.push(dy < 0 ? 'up' : 'down');
       }
     } else if (this.now() - this.touchStartTime < 0.35) {
-      // 탭: 화면 상/하 절반 터치 = 위/아래 줄 이동
-      const h = window.innerHeight;
-      this.push(touch.clientY < h / 2 ? 'up' : 'down');
+      // 탭: 점프(§5). 줄 이동은 수직 스와이프로 분리 — 탭과 겹치지 않게.
+      this.push('jump');
     }
   }
 }

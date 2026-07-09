@@ -30,6 +30,8 @@ export class Player {
   private laneT = 1; // 레인 보간 진행도 (1=완료)
   private laneFromIdx = CONFIG.lanes.startIndex; // 2D 세로 보간용 출발 줄 인덱스
   private queuedAction: Action | null = null; // 액션 중 입력 큐 1개 (§13.2)
+  private hopTime = -1; // 점프 경과(초). -1=지면. (§5 점프)
+  private hopY = 0; // 현재 hop 높이(월드 단위) — draw/airborne 판정에 사용
 
   // --- 전투/성장 스탯 ---
   hp = CONFIG.player.baseHp;
@@ -114,6 +116,19 @@ export class Player {
       this.laneT = Math.min(1, this.laneT + dt / CONFIG.lanes.moveTime);
     }
 
+    // 점프 hop 물리 (§5) — 포물선 아크, 체공 종료 시 착지
+    if (this.hopTime >= 0) {
+      this.hopTime += dt;
+      const air = CONFIG.run.jumpAirTime;
+      if (this.hopTime >= air) {
+        this.hopTime = -1;
+        this.hopY = 0;
+      } else {
+        const u = this.hopTime / air;
+        this.hopY = CONFIG.run.jumpPeak * 4 * u * (1 - u);
+      }
+    }
+
     // 액션 종료 시 큐 입력 실행 (§13.2 액션 중 입력 큐 1개)
     if (this.queuedAction && allowControl) {
       const a = this.queuedAction;
@@ -125,7 +140,7 @@ export class Player {
 
   private handleInput(input: Input): void {
     let action: Action | null;
-    while ((action = input.consumeAny(['up', 'down'])) !== null) {
+    while ((action = input.consumeAny(['up', 'down', 'jump'])) !== null) {
       if (!this.tryAction(action)) {
         this.queuedAction = action; // 실행 불가 → 1개 큐잉
       }
@@ -143,6 +158,12 @@ export class Player {
         if (this.lane >= CONFIG.lanes.count - 1) return true; // 맨 아래 줄
         this.startLaneMove(this.lane + 1);
         return true;
+      case 'jump':
+        if (this.hopTime < 0) {
+          this.hopTime = 0; // 지면에서만 점프 시작(더블점프 없음)
+          this.sfx?.('jump');
+        }
+        return true; // 공중이면 무시하되 큐에 남기지 않음
       default:
         return true;
     }
@@ -185,6 +206,8 @@ export class Player {
     this.invulnTimer = 0;
     this.dashTimer = 0;
     this.queuedAction = null;
+    this.hopTime = -1;
+    this.hopY = 0;
     this.alive = true;
   }
 
@@ -209,6 +232,11 @@ export class Player {
     return this.z;
   }
 
+  /** 점프 회피 판정 — hop 높이가 충분히 올라간 구간(§5). BLOCK/MOVER·보스 wave를 뛰어넘는다. */
+  get airborne(): boolean {
+    return this.hopY > CONFIG.run.jumpPeak * 0.35;
+  }
+
   /** 2D 렌더용 연속 줄 값(세로 보간, §3.1/§4 0.12s smoothstep). laneY(laneVisual)로 사용. */
   get laneVisual(): number {
     if (this.laneT >= 1) return this.lane;
@@ -227,13 +255,16 @@ export class Player {
 
     const w = 32;
     const h = 50;
-    const footY = baseY;
+    const lift = this.hopY * CONFIG.render.ppu; // 점프 hop 화면 높이(px)
+    const footY = baseY - lift;
     const bodyTop = footY - h;
 
     // 그림자
+    // 그림자 (지면에 고정 — 점프 시 축소되어 높이를 시각적으로 알린다)
+    const shScale = 1 - Math.min(0.55, (this.hopY / CONFIG.run.jumpPeak) * 0.55);
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(sx, baseY + 3, w * 0.5, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx, baseY + 3, w * 0.5 * shScale, 5 * shScale, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 망토
