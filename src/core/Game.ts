@@ -5,12 +5,13 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG, laneX, laneY, worldToScreenX } from '../data/config';
 import { t } from '../data/i18n';
 import { Input } from './Input';
 import { CameraController } from './Camera';
 import { Tutorial } from './Tutorial';
 import { Environment } from './Environment';
+import { Renderer2D } from './Renderer';
 import { computeScore, skillUnlocked, newlyUnlockedSkillKey } from './rules';
 import { Player } from '../entities/Player';
 import { Monster } from '../entities/Monster';
@@ -58,8 +59,9 @@ interface Checkpoint {
 // ------------------------------------------------------------
 
 export class Game {
+  /** 3D 데이터(scene) — 엔티티가 아직 .mesh를 가짐(shim, S6까지 유지). 렌더에는 미사용. */
   readonly scene: THREE.Scene;
-  readonly renderer: THREE.WebGLRenderer;
+  readonly renderer: Renderer2D;
   readonly cameraCtl: CameraController;
   readonly input: Input;
   readonly sound: SoundManager;
@@ -104,9 +106,7 @@ export class Game {
   private currentBgm: SoundId | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer = new Renderer2D(canvas);
 
     this.scene = new THREE.Scene();
     this.setMood('normal');
@@ -116,7 +116,7 @@ export class Game {
     dir.position.set(3, 8, -4);
     this.scene.add(hemi, dir);
 
-    this.env = new Environment(this.scene);
+    this.env = new Environment();
     this.cameraCtl = new CameraController(window.innerWidth / window.innerHeight);
 
     this.player = new Player();
@@ -139,7 +139,7 @@ export class Game {
     this.screens = new Screens(this);
 
     window.addEventListener('resize', () => {
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.resize();
       this.cameraCtl.resize(window.innerWidth / window.innerHeight);
     });
 
@@ -164,11 +164,31 @@ export class Game {
           this.accumulator -= this.STEP;
         }
       }
-      this.cameraCtl.update(frameDt, this.player.position, this.boss?.position ?? null);
-      this.renderer.render(this.scene, this.cameraCtl.camera);
+      this.cameraCtl.update(frameDt, this.player.worldX, this.boss?.z ?? null);
+      this.render();
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  /** Canvas 2D 렌더 — 배경/트랙 → (임시) 플레이어 사각형 (§3.1, S2 렌더 골격) */
+  private render(): void {
+    const { renderer, cameraCtl } = this;
+    renderer.begin();
+    const ctx = renderer.ctx;
+    this.env.draw(ctx, cameraCtl, this.world.theme);
+
+    const { dx, dy } = cameraCtl.shakeOffset;
+    renderer.withShake(dx, dy, () => {
+      const screenX = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
+      const screenY = laneY(this.player.lane);
+      const w = 40;
+      const h = 56;
+      ctx.fillStyle = '#ff7849';
+      ctx.fillRect(screenX - w / 2, screenY - h, w, h);
+    });
+
+    renderer.end();
   }
 
   // ----------------------------------------------------------
@@ -312,7 +332,6 @@ export class Game {
   private update(dt: number): void {
     switch (this.state) {
       case 'TITLE':
-        this.env.update(this.player.z);
         this.player.update(dt, this.input, false);
         break;
 
@@ -323,7 +342,6 @@ export class Game {
         this.tutorial?.update(dt);
         this.combat.update(dt);
         this.updateEntities(dt);
-        this.env.update(this.player.z);
         if (this.tutorial?.finished) this.finishTutorial();
         break;
       }
@@ -334,7 +352,6 @@ export class Game {
         if (this.stageIntroTimer > 0) {
           this.stageIntroTimer -= dt;
           this.player.update(dt, this.input, false);
-          this.env.update(this.player.z);
           if (this.stageIntroTimer <= 0) this.dismissStageIntro();
           break;
         }
@@ -349,7 +366,6 @@ export class Game {
         this.spawner.update(dt);
         this.combat.update(dt);
         this.updateEntities(dt);
-        this.env.update(this.player.z);
 
         // 구간 목표 도달 → 보스 진입 (§15.2)
         if (this.distance - this.segmentStart >= this.segmentLength) {

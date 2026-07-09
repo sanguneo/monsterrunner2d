@@ -292,4 +292,9 @@ export class Player {
   get position(): THREE.Vector3 {
     return this.group.position;
   }
+
+  /** 2D 렌더용 진행거리(worldX) — 현행 3D 전진값(z)을 그대로 사용 (§3.1) */
+  get worldX(): number {
+    return this.z;
+  }
 }
