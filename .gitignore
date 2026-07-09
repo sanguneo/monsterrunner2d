@@ -4,3 +4,5 @@ dist/
 .DS_Store
 *:Zone.Identifier
 .lazyweb/
+.gjc/
+.claude/
