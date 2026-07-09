@@ -4,7 +4,7 @@
 // view: 캡슐 프리미티브 + 망토 어태치먼트 (§3.1, §12)
 // ============================================================
 
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import type { Action, Input } from '../core/Input';
 import type { SoundId } from '../systems/Sound';
 
@@ -26,9 +26,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export class Player {
   // --- 위치/동작 상태 ---
   lane = CONFIG.lanes.startIndex;
-  x = laneX(CONFIG.lanes.startIndex);
   z = 0;
-  private laneFrom = laneX(CONFIG.lanes.startIndex);
   private laneT = 1; // 레인 보간 진행도 (1=완료)
   private laneFromIdx = CONFIG.lanes.startIndex; // 2D 세로 보간용 출발 줄 인덱스
   private queuedAction: Action | null = null; // 액션 중 입력 큐 1개 (§13.2)
@@ -111,15 +109,9 @@ export class Player {
 
     if (allowControl) this.handleInput(input);
 
-    // 레인 보간 (0.12s)
+    // 레인 보간 (0.12s, 2D 세로 렌더용 진행도만 갱신)
     if (this.laneT < 1) {
       this.laneT = Math.min(1, this.laneT + dt / CONFIG.lanes.moveTime);
-      const target = laneX(this.lane);
-      // smoothstep 보간
-      const s = this.laneT * this.laneT * (3 - 2 * this.laneT);
-      this.x = this.laneFrom + (target - this.laneFrom) * s;
-    } else {
-      this.x = laneX(this.lane);
     }
 
     // 액션 종료 시 큐 입력 실행 (§13.2 액션 중 입력 큐 1개)
@@ -157,7 +149,6 @@ export class Player {
   }
 
   private startLaneMove(target: number): void {
-    this.laneFrom = this.x;
     this.laneFromIdx = this.lane;
     this.lane = target;
     this.laneT = 0;
@@ -188,8 +179,6 @@ export class Player {
     this.exp = 0;
     this.expToNext = CONFIG.progression.expCurve(1);
     this.lane = CONFIG.lanes.startIndex;
-    this.x = laneX(this.lane);
-    this.laneFrom = this.x;
     this.laneFromIdx = this.lane;
     this.laneT = 1;
     this.z = 0;

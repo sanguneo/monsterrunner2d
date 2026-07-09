@@ -4,7 +4,7 @@
 // (수집 아이템과 한눈에 구분되도록 적대적 외형 통일)
 // ============================================================
 
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import type { MonsterDef, MonsterBehavior, MonsterShape } from '../data/worlds';
 
 function hex(n: number): string {
@@ -22,6 +22,13 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+/** weave 몬스터가 홈 줄↔이웃 줄을 오가는 주기(초) — 스폰마다 0.4~0.6s 사이로 살짝 랜덤화 */
+const WEAVE_TOGGLE_INTERVAL = [0.4, 0.6] as const;
+
+function randomWeaveInterval(): number {
+  return WEAVE_TOGGLE_INTERVAL[0] + Math.random() * (WEAVE_TOGGLE_INTERVAL[1] - WEAVE_TOGGLE_INTERVAL[0]);
+}
+
 export class Monster {
   alive = true;
   hp: number;
@@ -32,13 +39,20 @@ export class Monster {
   readonly id: string;
   readonly shape: MonsterShape;
   readonly color: number;
-  /** 화면상 x(연속값, weave 위빙 반영) — 판정/디버깅용 (§3.1) */
-  x: number;
   /** 바운스 반영 y (§3.1) */
   y = 0.8;
   private t = Math.random() * Math.PI * 2;
   /** 보스 소환 잡몹 여부 */
   isMinion = false;
+
+  /** weave: 스폰 시 배정된 원래 줄(토글 기준) */
+  private readonly homeLane: number;
+  /** weave: 홈 줄에서 이동할 이웃 줄 방향(+1/-1) — 경계 줄이면 안쪽으로만 고정 */
+  private readonly weaveDir: number;
+  /** weave: 다음 토글까지 남은 시간 */
+  private weaveTimer = randomWeaveInterval();
+  /** weave: 현재 홈 줄에 있는지(false면 이웃 줄로 이동한 상태) */
+  private weaveAtHome = true;
 
   constructor(
     def: MonsterDef,
@@ -53,7 +67,9 @@ export class Monster {
     this.exp = def.exp;
     this.shape = def.shape;
     this.color = def.color;
-    this.x = laneX(lane);
+    this.homeLane = lane;
+    // 맨 위 줄(0)이면 아래로만, 맨 아래 줄(count-1)이면 위로만, 그 외는 랜덤 방향
+    this.weaveDir = lane <= 0 ? 1 : lane >= CONFIG.lanes.count - 1 ? -1 : Math.random() < 0.5 ? -1 : 1;
   }
 
   update(dt: number, playerZ: number): void {
@@ -61,11 +77,14 @@ export class Monster {
     if (this.z > playerZ + 1.2) {
       this.z -= this.speed * dt;
     }
-    let x = laneX(this.lane);
     if (this.behavior === 'weave') {
-      x += Math.sin(this.t * 4) * 0.9;
+      this.weaveTimer -= dt;
+      if (this.weaveTimer <= 0) {
+        this.weaveTimer += randomWeaveInterval();
+        this.weaveAtHome = !this.weaveAtHome;
+        this.lane = this.weaveAtHome ? this.homeLane : this.homeLane + this.weaveDir;
+      }
     }
-    this.x = x;
     this.y = 0.8 + Math.sin(this.t * 3) * 0.12;
   }
 

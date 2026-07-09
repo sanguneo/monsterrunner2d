@@ -13,7 +13,7 @@ export interface BossPhaseConfig {
 }
 
 export const CONFIG = {
-  lanes: { count: 3, spacing: 2.0, moveTime: 0.12, startIndex: 1 },
+  lanes: { count: 3, moveTime: 0.12, startIndex: 1 },
 
   // 2D 렌더 파라미터 (§20) — laneSpacingPx는 세로 줄 간격(px)
   render: {
@@ -142,12 +142,6 @@ export const CONFIG = {
   },
   i18n: { defaultLocale: 'ko' as const, locales: ['ko', 'en'] as const },
 };
-
-// 카메라가 플레이어 뒤(-Z)에서 +Z를 바라보므로 월드 +X가 화면 왼쪽에 보인다.
-// 레인 0(좌)이 화면 왼쪽에 오도록 +X에 매핑한다.
-export function laneX(lane: number): number {
-  return (1 - lane) * CONFIG.lanes.spacing;
-}
 
 // 줄(row) → 화면 기준선 Y. lane 0=위, 1=중간, 2=아래.
 export function laneY(lane: number): number {

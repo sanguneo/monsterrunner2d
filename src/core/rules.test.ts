@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { skillUnlocked, newlyUnlockedSkillKey, computeScore, pickThreatLanes } from './rules';
 import type { SkillUnlocks } from './rules';
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG, laneY } from '../data/config';
 
 const UNLOCKS: SkillUnlocks = { rapidFire: 3, healPulse: 5 };
 
@@ -89,11 +89,13 @@ describe('pickThreatLanes (안전 레인 보장)', () => {
   });
 });
 
-describe('laneX (레인 매핑)', () => {
-  it('레인0(좌)=+X, 레인2(우)=-X, 중앙=0', () => {
-    expect(laneX(0)).toBeCloseTo(CONFIG.lanes.spacing);
-    expect(laneX(1)).toBe(0);
-    expect(laneX(2)).toBeCloseTo(-CONFIG.lanes.spacing);
+// 구 3D 가로좌표 헬퍼(레인→가로좌표 매핑) 제거 — lane(정수)이 세로 위치의 단일 SoT다.
+// 그 SoT를 렌더 기준선으로 변환하는 함수만 최소 1개 확인해 config.test.ts와의 중복을 피한다.
+describe('레인 세로 SoT → 화면 기준선 매핑', () => {
+  it('레인 인덱스가 커질수록 화면 아래로 내려간다(0=위 … count-1=아래)', () => {
+    for (let l = 1; l < CONFIG.lanes.count; l++) {
+      expect(laneY(l)).toBeGreaterThan(laneY(l - 1));
+    }
   });
 });
 

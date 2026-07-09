@@ -3,7 +3,7 @@
 // view: 회전 다면체 프리미티브 (§3.1)
 // ============================================================
 
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 
 export type PickupType = 'coin' | 'gem' | 'heal';
 
@@ -12,7 +12,6 @@ export class Pickup {
   /** 플레이어가 실제로 획득했는지 (despawn과 구분 — 튜토리얼 성공 판정용) */
   collected = false;
   readonly baseY: number;
-  readonly x: number;
   y: number;
   /** 회전 각(호) — coin/gem 스핀 애니메이션에 사용 (§3.1) */
   spin = 0;
@@ -26,7 +25,6 @@ export class Pickup {
   ) {
     this.baseY = y;
     this.y = y;
-    this.x = laneX(lane);
   }
 
   update(dt: number): void {

@@ -3,7 +3,7 @@
 // 적 탄은 보스별 색·모양 커스텀 (ball/rod/shard)
 // ============================================================
 
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import type { EnemyProjShape } from '../data/worlds';
 
 function hex(n: number): string {
@@ -26,8 +26,8 @@ export class Projectile {
   constructor(
     public owner: 'player' | 'enemy',
     public damage: number,
-    /** 레인의 x좌표(연속값) — lane getter가 여기서 가장 가까운 레인을 역산한다 */
-    public x: number,
+    /** 판정/렌더에 쓰는 정수 줄(lane) — SoT (§3.1) */
+    public lane: number,
     public y: number,
     /** 진행거리(worldX) — 3D shim 시절의 z축 그대로 사용 (§3.1) */
     public worldX: number,
@@ -48,7 +48,7 @@ export class Projectile {
     return new Projectile(
       'player',
       damage,
-      laneX(lane),
+      lane,
       1.0,
       fromWorldX,
       CONFIG.projectiles.playerSpeed,
@@ -59,7 +59,7 @@ export class Projectile {
 
   /** 적 투사체 생성 — Boss/Game이 THREE 없이 호출하는 팩토리 (§9, §3.1) */
   static forEnemy(lane: number, fromWorldX: number, damage: number, speed: number, style: EnemyProjStyle = {}): Projectile {
-    return new Projectile('enemy', damage, laneX(lane), 1.0, fromWorldX, -speed, false, 4.0, style);
+    return new Projectile('enemy', damage, lane, 1.0, fromWorldX, -speed, false, 4.0, style);
   }
 
   update(dt: number): void {
@@ -69,12 +69,6 @@ export class Projectile {
     if (this.spin) {
       this.rot += dt * 10;
     }
-  }
-
-  /** 2D 렌더용 레인 근사값 — 실제 위치(연속 x)를 가장 가까운 레인으로 매핑 (§3.1) */
-  get lane(): number {
-    const l = Math.round(1 - this.x / CONFIG.lanes.spacing);
-    return Math.min(CONFIG.lanes.count - 1, Math.max(0, l));
   }
 
   /** 2D 드로우 — owner(player=밝은 원 / enemy=ball·rod·shard) + 색 (§3.1) */

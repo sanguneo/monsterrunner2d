@@ -4,7 +4,7 @@
 // FINALBOSS → REWARD → RESULT / GAMEOVER(체크포인트 부활)
 // ============================================================
 
-import { CONFIG, laneX, laneY, worldToScreenX } from '../data/config';
+import { CONFIG, laneY, worldToScreenX } from '../data/config';
 import { t } from '../data/i18n';
 import { Input } from './Input';
 import { CameraController } from './Camera';

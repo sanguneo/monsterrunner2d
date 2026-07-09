@@ -3,7 +3,7 @@
 // view-logic 분리: 프리미티브 벽, 추후 모델 교체 가능.
 // ============================================================
 
-import { CONFIG, laneX } from '../data/config';
+import { CONFIG } from '../data/config';
 import type { Player } from './Player';
 
 export type ObstacleType = 'BLOCK' | 'MOVER';
@@ -28,7 +28,6 @@ export class Obstacle {
   hitDone = false;
   /** worldX(진행축) 판정 두께 */
   readonly zLen = 0.8;
-  x: number;
 
   /** MOVER 슬라럼 — 다음 줄 이동까지 남은 시간 */
   private moveTimer: number;
@@ -39,7 +38,6 @@ export class Obstacle {
     public lane: number,
     public z: number,
   ) {
-    this.x = laneX(lane);
     this.moveTimer = CONFIG.obstacles.moverInterval;
   }
 
@@ -54,7 +52,6 @@ export class Obstacle {
         next = this.lane + this.moveDir;
       }
       this.lane = next;
-      this.x = laneX(this.lane);
       this.moveTimer += CONFIG.obstacles.moverInterval;
     }
   }
