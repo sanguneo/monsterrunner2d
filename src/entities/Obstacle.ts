@@ -3,18 +3,12 @@
 // view-logic 분리: 프리미티브 벽, 추후 모델 교체 가능.
 // ============================================================
 
-import * as THREE from 'three';
 import { CONFIG, laneX } from '../data/config';
 import type { Player } from './Player';
 
 export type ObstacleType = 'BLOCK' | 'MOVER';
 
-const blockGeo = new THREE.BoxGeometry(1.9, 3.0, 0.8);
-const blockMat = new THREE.MeshStandardMaterial({ color: 0x57534e });
-const moverGeo = new THREE.BoxGeometry(1.8, 2.6, 0.8);
-const moverMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed });
-
-// 2D draw용 테마 색상 (THREE 머티리얼과 함께 갱신 — applyObstacleTheme 참고)
+// 2D draw용 테마 색상 (월드 테마마다 달라짐 — applyObstacleTheme 참고)
 let blockColor = 0x57534e;
 let moverColor = 0x7c3aed;
 
@@ -24,8 +18,6 @@ function hex(n: number): string {
 
 /** 월드 테마 색상 적용 — 스테이지마다 장애물 색이 달라진다 */
 export function applyObstacleTheme(colors: { obsHigh: number; obsBlock: number }): void {
-  blockMat.color.setHex(colors.obsBlock);
-  moverMat.color.setHex(colors.obsHigh);
   blockColor = colors.obsBlock;
   moverColor = colors.obsHigh;
 }
@@ -34,9 +26,9 @@ export class Obstacle {
   alive = true;
   /** 충돌 데미지 중복 방지 */
   hitDone = false;
-  readonly mesh: THREE.Mesh;
   /** worldX(진행축) 판정 두께 */
   readonly zLen = 0.8;
+  x: number;
 
   /** MOVER 슬라럼 — 다음 줄 이동까지 남은 시간 */
   private moveTimer: number;
@@ -47,9 +39,7 @@ export class Obstacle {
     public lane: number,
     public z: number,
   ) {
-    this.mesh =
-      type === 'BLOCK' ? new THREE.Mesh(blockGeo, blockMat) : new THREE.Mesh(moverGeo, moverMat);
-    this.mesh.position.set(laneX(lane), 1.5, z);
+    this.x = laneX(lane);
     this.moveTimer = CONFIG.obstacles.moverInterval;
   }
 
@@ -64,7 +54,7 @@ export class Obstacle {
         next = this.lane + this.moveDir;
       }
       this.lane = next;
-      this.mesh.position.x = laneX(this.lane);
+      this.x = laneX(this.lane);
       this.moveTimer += CONFIG.obstacles.moverInterval;
     }
   }

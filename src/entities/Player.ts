@@ -4,7 +4,6 @@
 // view: 캡슐 프리미티브 + 망토 어태치먼트 (§3.1, §12)
 // ============================================================
 
-import * as THREE from 'three';
 import { CONFIG, laneX } from '../data/config';
 import type { Action, Input } from '../core/Input';
 import type { SoundId } from '../systems/Sound';
@@ -47,85 +46,53 @@ export class Player {
   dashTimer = 0; // 무적 대시 잔여 시간
   alive = true;
 
-  // --- view (3D shim — S6까지 유지, 2D 렌더에는 미사용) ---
-  readonly group: THREE.Group;
-  private body: THREE.Mesh;
-  private capeMesh: THREE.Mesh | null = null;
-  private hatMesh: THREE.Mesh | null = null;
+  // --- view (2D draw용 스칼라 상태) ---
+  /** 달리기 바운스 반영 몸통 y (§3.1) */
+  private bodyY = 0.8;
+  private bodyVisible = true;
+  /** 망토 색상(hex) — 미장착이면 null (§12) */
+  private capeColorHex: number | null = null;
+  private capeWave = 0.25;
+  /** 모자 색상(hex) — 미장착이면 null (§12) */
+  private hatColorHex: number | null = null;
   private time = 0;
   /** 동작 성공 시 효과음 재생 훅 (Game이 SoundManager로 연결) */
   sfx: ((id: SoundId) => void) | null = null;
 
-  constructor() {
-    this.group = new THREE.Group();
-    const geo = new THREE.CapsuleGeometry(0.4, 0.8, 6, 12);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xff7849, emissive: 0x33150a });
-    this.body = new THREE.Mesh(geo, mat);
-    this.body.position.y = 0.8;
-    this.group.add(this.body);
-  }
-
   /** 망토 장착 외형 (§12) — Cosmetics에서 호출. 색상은 보상 아이템별. */
   equipCape(color: number): void {
-    if (this.capeMesh) {
-      (this.capeMesh.material as THREE.MeshStandardMaterial).color.setHex(color);
-      return;
-    }
-    const geo = new THREE.ConeGeometry(0.55, 1.1, 10, 1, true);
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: 0x222233,
-      transparent: true,
-      opacity: 0.88,
-      side: THREE.DoubleSide,
-    });
-    this.capeMesh = new THREE.Mesh(geo, mat);
-    this.capeMesh.position.set(0, 0.75, -0.28);
-    this.capeMesh.rotation.x = 0.25;
-    this.group.add(this.capeMesh);
+    this.capeColorHex = color;
   }
 
   unequipCape(): void {
-    if (!this.capeMesh) return;
-    this.group.remove(this.capeMesh);
-    this.capeMesh = null;
+    this.capeColorHex = null;
   }
 
   /** 모자 장착 외형 (§12 모자 슬롯) */
   equipHat(color: number): void {
-    if (this.hatMesh) {
-      (this.hatMesh.material as THREE.MeshStandardMaterial).color.setHex(color);
-      return;
-    }
-    const geo = new THREE.ConeGeometry(0.36, 0.5, 10);
-    const mat = new THREE.MeshStandardMaterial({ color, emissive: 0x222222 });
-    this.hatMesh = new THREE.Mesh(geo, mat);
-    this.hatMesh.position.set(0, 1.85, 0);
-    this.group.add(this.hatMesh);
+    this.hatColorHex = color;
   }
 
   unequipHat(): void {
-    if (!this.hatMesh) return;
-    this.group.remove(this.hatMesh);
-    this.hatMesh = null;
+    this.hatColorHex = null;
   }
 
   get hasCape(): boolean {
-    return this.capeMesh !== null;
+    return this.capeColorHex !== null;
   }
 
   get hasHat(): boolean {
-    return this.hatMesh !== null;
+    return this.hatColorHex !== null;
   }
 
   /** 망토 색상(hex) — 2D draw용. 미장착이면 null. */
   get capeColor(): number | null {
-    return this.capeMesh ? (this.capeMesh.material as THREE.MeshStandardMaterial).color.getHex() : null;
+    return this.capeColorHex;
   }
 
   /** 모자 색상(hex) — 2D draw용. 미장착이면 null. */
   get hatColor(): number | null {
-    return this.hatMesh ? (this.hatMesh.material as THREE.MeshStandardMaterial).color.getHex() : null;
+    return this.hatColorHex;
   }
 
   get invulnerable(): boolean {
@@ -233,28 +200,19 @@ export class Player {
   }
 
   private updateView(): void {
-    this.group.position.set(this.x, 0, this.z);
-    this.body.position.y = 0.8;
     // 달리기 바운스
-    this.body.position.y += Math.abs(Math.sin(this.time * 10)) * 0.06;
+    this.bodyY = 0.8 + Math.abs(Math.sin(this.time * 10)) * 0.06;
     // 무적/대시 깜빡임
     if (this.dashTimer > 0) {
-      this.body.visible = true;
-      (this.body.material as THREE.MeshStandardMaterial).emissive.setHex(0x2255aa);
+      this.bodyVisible = true;
     } else if (this.invulnTimer > 0) {
-      this.body.visible = Math.floor(this.time * 14) % 2 === 0;
-      (this.body.material as THREE.MeshStandardMaterial).emissive.setHex(0x33150a);
+      this.bodyVisible = Math.floor(this.time * 14) % 2 === 0;
     } else {
-      this.body.visible = true;
-      (this.body.material as THREE.MeshStandardMaterial).emissive.setHex(0x33150a);
+      this.bodyVisible = true;
     }
-    if (this.capeMesh) {
-      this.capeMesh.rotation.x = 0.25 + Math.sin(this.time * 6) * 0.08;
+    if (this.capeColorHex !== null) {
+      this.capeWave = 0.25 + Math.sin(this.time * 6) * 0.08;
     }
-  }
-
-  get position(): THREE.Vector3 {
-    return this.group.position;
   }
 
   /** 2D 렌더용 진행거리(worldX) — 현행 3D 전진값(z)을 그대로 사용 (§3.1) */
@@ -276,6 +234,7 @@ export class Player {
   draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
     // 무적(비대시) 시 점멸 — 대시 중엔 항상 표시
     if (this.dashTimer <= 0 && this.invulnTimer > 0 && Math.floor(this.time * 14) % 2 !== 0) return;
+    if (!this.bodyVisible) return;
 
     const w = 32;
     const h = 50;

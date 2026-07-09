@@ -1,0 +1,52 @@
+{
+  "skill": "ultragoal",
+  "phase": "active",
+  "active": true,
+  "activated_at": "2026-07-09T08:37:47.357Z",
+  "updated_at": "2026-07-09T08:37:47.357Z",
+  "session_id": "019f4523-4597-7000-b543-7a0fbc9052f8",
+  "hud": {
+    "version": 1,
+    "chips": [
+      {
+        "label": "goals",
+        "value": "4/5",
+        "priority": 10
+      },
+      {
+        "label": "current",
+        "value": "G005:S6-S7 three 완전 제거 마감 + 전체 검증",
+        "priority": 20
+      },
+      {
+        "label": "status",
+        "value": "active",
+        "priority": 30
+      },
+      {
+        "label": "ledger",
+        "value": "goal_started:G005",
+        "priority": 35
+      }
+    ],
+    "updated_at": "2026-07-09T08:37:47.352Z"
+  },
+  "receipt": {
+    "version": 1,
+    "skill": "ultragoal",
+    "owner": "gjc-runtime",
+    "command": "gjc ultragoal (reconcile)",
+    "state_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\skill-active-state.json",
+    "storage_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\ultragoal-state.json",
+    "mutated_at": "2026-07-09T08:37:47.332Z",
+    "fresh_until": "2026-07-09T09:07:47.332Z",
+    "status": "fresh",
+    "mutation_id": "ultragoal:reconcile:2026-07-09T08:37:47.332Z",
+    "verb": "reconcile",
+    "forced": true,
+    "from_phase": "active",
+    "to_phase": "active"
+  },
+  "source_state_revision": 11,
+  "state_revision": 7
+}

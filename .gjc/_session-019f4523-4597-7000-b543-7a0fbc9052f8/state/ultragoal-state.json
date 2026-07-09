@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "skill": "ultragoal",
+  "current_phase": "active",
+  "active": true,
+  "handoff_from": "ralplan",
+  "handoff_at": "2026-07-09T06:17:48.392Z",
+  "updated_at": "2026-07-09T08:37:47.332Z",
+  "receipt": {
+    "version": 1,
+    "skill": "ultragoal",
+    "owner": "gjc-runtime",
+    "command": "gjc ultragoal (reconcile)",
+    "state_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\skill-active-state.json",
+    "storage_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\ultragoal-state.json",
+    "mutated_at": "2026-07-09T08:37:47.332Z",
+    "fresh_until": "2026-07-09T09:07:47.332Z",
+    "status": "fresh",
+    "mutation_id": "ultragoal:reconcile:2026-07-09T08:37:47.332Z",
+    "verb": "reconcile",
+    "from_phase": "active",
+    "to_phase": "active",
+    "forced": true,
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "575f963641784231bb48599a1efcc0f58ed729f79874f5c5fa3b9d01268bcbf1",
+      "covered_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\_session-019f4523-4597-7000-b543-7a0fbc9052f8\\state\\ultragoal-state.json",
+      "computed_at": "2026-07-09T08:37:47.335Z"
+    }
+  },
+  "session_id": "019f4523-4597-7000-b543-7a0fbc9052f8",
+  "status": "active",
+  "goals": [
+    {
+      "id": "G001",
+      "title": "S0-S1 문서 동기 + config/좌표/타입 기반",
+      "status": "complete"
+    },
+    {
+      "id": "G002",
+      "title": "S2-S3 Canvas 2D 렌더러·카메라·환경 + 엔티티 draw 이식",
+      "status": "complete"
+    },
+    {
+      "id": "G003",
+      "title": "S4 러닝 닷지 배선 + Combat THREE 제거 + 장애물 유니온 정리",
+      "status": "complete"
+    },
+    {
+      "id": "G004",
+      "title": "S5 보스 줄 패턴 축 전환 + walls P0 수정 + Player 수직상태 이관",
+      "status": "complete"
+    },
+    {
+      "id": "G005",
+      "title": "S6-S7 three 완전 제거 마감 + 전체 검증",
+      "status": "active"
+    }
+  ],
+  "counts": {
+    "pending": 0,
+    "active": 1,
+    "complete": 4,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "superseded": 0
+  },
+  "ledger_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\_session-019f4523-4597-7000-b543-7a0fbc9052f8\\ultragoal\\ledger.jsonl",
+  "brief_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\_session-019f4523-4597-7000-b543-7a0fbc9052f8\\ultragoal\\brief.md",
+  "goals_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\_session-019f4523-4597-7000-b543-7a0fbc9052f8\\ultragoal\\goals.json",
+  "active_goal_id": "G005",
+  "gjc_objective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "nudge_budget": 10,
+  "nudge_count": 0,
+  "nudge_remaining": 10,
+  "nudge_goal_id": "G005",
+  "nudge_target_kind": "story",
+  "latestLedgerEvent": {
+    "event": "goal_started",
+    "goalId": "G005",
+    "timestamp": "2026-07-09T08:37:47.319Z"
+  },
+  "state_revision": 11
+}

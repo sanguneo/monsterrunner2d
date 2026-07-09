@@ -4,8 +4,6 @@
 // ============================================================
 
 export type SoundId =
-  | 'jump'
-  | 'slide'
   | 'laneMove'
   | 'coin'
   | 'gem'

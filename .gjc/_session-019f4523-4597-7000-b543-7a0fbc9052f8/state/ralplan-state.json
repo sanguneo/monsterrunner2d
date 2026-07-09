@@ -1,0 +1,31 @@
+{
+  "active": false,
+  "version": 2,
+  "current_phase": "handoff",
+  "skill": "ralplan",
+  "cwd": "C:\\Users\\USER\\WebstormProjects\\m2d",
+  "updated_at": "2026-07-09T06:17:48.392Z",
+  "session_id": "019f4523-4597-7000-b543-7a0fbc9052f8",
+  "receipt": {
+    "version": 1,
+    "skill": "ralplan",
+    "owner": "gjc-state-cli",
+    "command": "gjc state ralplan handoff --to ultragoal",
+    "state_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\skill-active-state.json",
+    "storage_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\state\\sessions\\019f4523-4597-7000-b543-7a0fbc9052f8\\ralplan-state.json",
+    "mutated_at": "2026-07-09T06:17:48.392Z",
+    "fresh_until": "2026-07-09T06:47:48.392Z",
+    "status": "fresh",
+    "mutation_id": "ralplan:handoff:ultragoal:2026-07-09T06:17:48.392Z",
+    "content_sha256": {
+      "algorithm": "sha256",
+      "value": "42407cc02e33b22e0bdf54d807260c12ed50d69bb10df85dd8f5bb9027b9c3bd",
+      "covered_path": "C:\\Users\\USER\\WebstormProjects\\m2d\\.gjc\\_session-019f4523-4597-7000-b543-7a0fbc9052f8\\state\\ralplan-state.json",
+      "computed_at": "2026-07-09T06:17:48.545Z"
+    }
+  },
+  "run_id": "019f4523-4597-7000-b543-7a0fbc9052f8",
+  "handoff_to": "ultragoal",
+  "handoff_at": "2026-07-09T06:17:48.392Z",
+  "state_revision": 3
+}

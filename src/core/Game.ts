@@ -4,7 +4,6 @@
 // FINALBOSS → REWARD → RESULT / GAMEOVER(체크포인트 부활)
 // ============================================================
 
-import * as THREE from 'three';
 import { CONFIG, laneX, laneY, worldToScreenX } from '../data/config';
 import { t } from '../data/i18n';
 import { Input } from './Input';
@@ -59,8 +58,6 @@ interface Checkpoint {
 // ------------------------------------------------------------
 
 export class Game {
-  /** 3D 데이터(scene) — 엔티티가 아직 .mesh를 가짐(shim, S6까지 유지). 렌더에는 미사용. */
-  readonly scene: THREE.Scene;
   readonly renderer: Renderer2D;
   readonly cameraCtl: CameraController;
   readonly input: Input;
@@ -104,23 +101,17 @@ export class Game {
   private finalScore = 0;
   private isNewRecord = false;
   private currentBgm: SoundId | null = null;
+  private mood: 'normal' | 'dark' = 'normal';
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer2D(canvas);
 
-    this.scene = new THREE.Scene();
     this.setMood('normal');
-
-    const hemi = new THREE.HemisphereLight(0xbcaaff, 0x2a1f3d, 1.1);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(3, 8, -4);
-    this.scene.add(hemi, dir);
 
     this.env = new Environment();
     this.cameraCtl = new CameraController(window.innerWidth / window.innerHeight);
 
     this.player = new Player();
-    this.scene.add(this.player.group);
 
     this.sound = new SoundManager();
     this.player.sfx = (id) => this.sound.play(id); // 레인이동 효과음 배선
@@ -176,7 +167,9 @@ export class Game {
     const { renderer, cameraCtl } = this;
     renderer.begin();
     const ctx = renderer.ctx;
-    this.env.draw(ctx, cameraCtl, this.world.theme);
+    const theme = this.world.theme;
+    const bgTheme = this.mood === 'dark' ? { ...theme, bg: theme.bgDark } : theme;
+    this.env.draw(ctx, cameraCtl, bgTheme);
 
     const { dx, dy } = cameraCtl.shakeOffset;
     const width = CONFIG.render.logicalWidth;
@@ -203,7 +196,7 @@ export class Game {
         }
         for (const pr of this.projectiles) {
           if (pr.lane !== lane) continue;
-          const sx = worldToScreenX(pr.position.z, cameraCtl.scrollWorldX);
+          const sx = worldToScreenX(pr.worldX, cameraCtl.scrollWorldX);
           if (onScreen(sx)) pr.draw(ctx, sx, baseY);
         }
       }
@@ -447,7 +440,6 @@ export class Game {
       const m = this.monsters[i];
       if (m.alive) m.update(dt, pz);
       if (!m.alive || m.z < behind) {
-        this.scene.remove(m.mesh);
         this.monsters.splice(i, 1);
       }
     }
@@ -455,7 +447,6 @@ export class Game {
       const o = this.obstacles[i];
       if (o.alive) o.update(dt); // MOVER 슬라럼 lane 이동 (§6.1)
       if (!o.alive || o.z < behind) {
-        this.scene.remove(o.mesh);
         this.obstacles.splice(i, 1);
       }
     }
@@ -463,7 +454,6 @@ export class Game {
       const pk = this.pickups[i];
       if (pk.alive) pk.update(dt);
       if (!pk.alive || pk.z < behind) {
-        this.scene.remove(pk.mesh);
         this.pickups.splice(i, 1);
       }
     }
@@ -756,21 +746,18 @@ export class Game {
   spawnMonster(def: MonsterDef, lane: number, z: number): Monster {
     const m = new Monster(def, lane, z);
     this.monsters.push(m);
-    this.scene.add(m.mesh);
     return m;
   }
 
   spawnObstacle(type: ObstacleType, lane: number, z: number): Obstacle {
     const o = new Obstacle(type, lane, z);
     this.obstacles.push(o);
-    this.scene.add(o.mesh);
     return o;
   }
 
   spawnPickup(type: PickupType, lane: number, z: number, y?: number): Pickup {
     const pk = new Pickup(type, lane, z, y);
     this.pickups.push(pk);
-    this.scene.add(pk.mesh);
     return pk;
   }
 
@@ -781,11 +768,8 @@ export class Game {
     speed: number,
     style: { color?: number; shape?: 'ball' | 'rod' | 'shard' } = {},
   ): void {
-    const pos = new THREE.Vector3(laneX(lane), 1.0, z);
-    const vel = new THREE.Vector3(0, 0, -speed);
-    const proj = new Projectile('enemy', damage, pos, vel, false, 4.0, style);
+    const proj = Projectile.forEnemy(lane, z, damage, speed, style);
     this.projectiles.push(proj);
-    this.scene.add(proj.mesh);
   }
 
   /** 플레이어 피해 적용 — 튜토리얼 무피해 (§14) / 무적 처리 (§11.1) */
@@ -806,7 +790,6 @@ export class Game {
   onMonsterKilled(m: Monster): void {
     if (!this.monsters.includes(m)) return;
     m.alive = false;
-    this.scene.remove(m.mesh);
     this.stats.kills += 1;
     this.sound.play('kill');
 
@@ -825,13 +808,8 @@ export class Game {
     }
   }
 
-  removeMonsterMesh(m: Monster): void {
-    this.scene.remove(m.mesh);
-  }
-
   onPickupCollected(pk: Pickup): void {
     pk.collected = true;
-    this.scene.remove(pk.mesh);
     switch (pk.type) {
       case 'coin':
         this.inventory.addCoins(1);
@@ -871,11 +849,9 @@ export class Game {
   // 월드 정리 / 분위기
   // ----------------------------------------------------------
 
+  /** dark mood flag only — Environment.draw picks theme.bg/bgDark from it (§9.3, §3.1) */
   setMood(mode: 'normal' | 'dark'): void {
-    const theme = this.world.theme;
-    const bg = mode === 'dark' ? theme.bgDark : theme.bg;
-    this.scene.background = new THREE.Color(bg);
-    this.scene.fog = new THREE.Fog(bg, 24, mode === 'dark' ? 55 : 80);
+    this.mood = mode;
   }
 
   /** BGM 전환 — 동시 1개. 같은 트랙이면 무시(중복 재생 방지). null이면 정지. */
@@ -887,10 +863,6 @@ export class Game {
   }
 
   private clearEntities(): void {
-    this.monsters.forEach((m) => this.scene.remove(m.mesh));
-    this.obstacles.forEach((o) => this.scene.remove(o.mesh));
-    this.pickups.forEach((pk) => this.scene.remove(pk.mesh));
-    this.projectiles.forEach((p) => this.scene.remove(p.mesh));
     this.monsters = [];
     this.obstacles = [];
     this.pickups = [];

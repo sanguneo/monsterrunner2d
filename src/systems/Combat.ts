@@ -202,7 +202,6 @@ export class Combat {
         if (p.dashTimer > 0) continue; // 무적 대시: 관통
         if (game.damagePlayer(m.contactDamage)) {
           m.alive = false; // 접촉한 몬스터는 소멸 (EXP 없음)
-          game.removeMonsterMesh(m);
         }
       }
     }
