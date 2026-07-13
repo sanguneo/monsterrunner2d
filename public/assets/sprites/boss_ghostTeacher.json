@@ -1,0 +1,15 @@
+{
+  "image": "boss_ghostTeacher_atlas.png",
+  "pivot": "bottom",
+  "states": {
+    "idle": {
+      "fps": 6,
+      "loop": true,
+      "frames": [
+        { "x": 0, "y": 0, "w": 256, "h": 256 },
+        { "x": 256, "y": 0, "w": 256, "h": 256 },
+        { "x": 512, "y": 0, "w": 256, "h": 256 }
+      ]
+    }
+  }
+}

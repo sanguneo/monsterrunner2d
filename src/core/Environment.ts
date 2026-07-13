@@ -7,6 +7,7 @@
 import { CONFIG, laneY, worldToScreenX } from '../data/config';
 import type { WorldTheme } from '../data/worlds';
 import type { CameraController } from './Camera';
+import { sprite, currentWorld } from '../systems/Sprites';
 
 function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
@@ -24,34 +25,41 @@ export class Environment {
   draw(ctx: CanvasRenderingContext2D, camera: CameraController, theme: WorldTheme = this.theme ?? DEFAULT_THEME): void {
     const w = CONFIG.render.logicalWidth;
     const h = CONFIG.render.logicalHeight;
-    const bg = hex(theme.bg);
-    const floorColor = hex(theme.floor);
-    const wallA = hex(theme.wallA);
-    const wallB = hex(theme.wallB);
+    const worldId = currentWorld();
 
-    ctx.fillStyle = bg;
+    // 하늘/기본 바탕 — 원경 스프라이트가 없을 때의 바탕이자 상단 채움
+    ctx.fillStyle = hex(theme.bg);
     ctx.fillRect(0, 0, w, h);
 
-    // 원경 패럴럭스 밴드 (느린 스크롤, §7)
-    const bandH = h * 0.32;
-    ctx.fillStyle = wallB;
-    ctx.fillRect(0, 0, w, bandH);
-    const farOriginX = worldToScreenX(0, camera.scrollWorldX * 0.3);
-    const spacing = 140;
-    const farOffset = ((farOriginX % spacing) + spacing) % spacing;
-    ctx.fillStyle = wallA;
-    for (let x = farOffset - spacing; x < w + spacing; x += spacing) {
-      ctx.fillRect(x, bandH * 0.4, 56, bandH * 0.6);
-    }
-
-    // 트랙 바닥 (3줄)
     const half = CONFIG.render.laneSpacingPx / 2;
     const trackTop = laneY(0) - half;
     const trackBottom = laneY(2) + half;
-    ctx.fillStyle = floorColor;
-    ctx.fillRect(0, trackTop, w, trackBottom - trackTop);
 
-    // 줄 구분선(점선) — worldToScreenX 기준으로 스크롤과 동기화
+    // 원경(far) — 0.3배 패럴럭스, 상단 하늘 밴드 [0, trackTop]. 로드 전이면 색 밴드+기둥 폴백.
+    if (!this.drawLayer(ctx, `env_${worldId}_far`, camera.scrollWorldX * 0.3, 0, trackTop)) {
+      const bandH = h * 0.32;
+      ctx.fillStyle = hex(theme.wallB);
+      ctx.fillRect(0, 0, w, bandH);
+      const farOriginX = worldToScreenX(0, camera.scrollWorldX * 0.3);
+      const spacing = 140;
+      const farOffset = ((farOriginX % spacing) + spacing) % spacing;
+      ctx.fillStyle = hex(theme.wallA);
+      for (let x = farOffset - spacing; x < w + spacing; x += spacing) {
+        ctx.fillRect(x, bandH * 0.4, 56, bandH * 0.6);
+      }
+    }
+
+    // 근경(near) — 0.6배 패럴럭스, 바닥이 trackTop인 지평선 스트립(장식). 없으면 생략.
+    const nearH = Math.max(90, trackTop * 0.7);
+    this.drawLayer(ctx, `env_${worldId}_near`, camera.scrollWorldX * 0.6, trackTop - nearH, nearH);
+
+    // 바닥(floor) — 1.0배 패럴럭스, 트랙 밴드 [trackTop, 화면 하단]. 로드 전이면 단색 폴백.
+    if (!this.drawLayer(ctx, `env_${worldId}_floor`, camera.scrollWorldX, trackTop, h - trackTop)) {
+      ctx.fillStyle = hex(theme.floor);
+      ctx.fillRect(0, trackTop, w, trackBottom - trackTop);
+    }
+
+    // 줄 구분선(점선) — 게임플레이 가독성 유지, worldToScreenX 기준 스크롤 동기화
     const originX = worldToScreenX(0, camera.scrollWorldX);
     const dashSpan = 32;
     const dashOffset = ((originX % dashSpan) + dashSpan) % dashSpan;
@@ -66,6 +74,27 @@ export class Environment {
       ctx.stroke();
     }
     ctx.setLineDash([]);
+  }
+
+  /** 스프라이트 레이어를 밴드 높이에 맞춰 가로 반복 타일링(패럴럭스). 로드 전이면 false. */
+  private drawLayer(
+    ctx: CanvasRenderingContext2D,
+    name: string,
+    scrollWorldX: number,
+    bandTop: number,
+    bandH: number,
+  ): boolean {
+    const img = sprite(name);
+    if (!img || img.naturalHeight === 0) return false;
+    const tileW = img.naturalWidth * (bandH / img.naturalHeight);
+    if (tileW <= 0) return false;
+    const originX = worldToScreenX(0, scrollWorldX);
+    const offset = ((originX % tileW) + tileW) % tileW;
+    const w = CONFIG.render.logicalWidth;
+    for (let x = offset - tileW; x < w + tileW; x += tileW) {
+      ctx.drawImage(img, x, bandTop, tileW, bandH);
+    }
+    return true;
   }
 }
 

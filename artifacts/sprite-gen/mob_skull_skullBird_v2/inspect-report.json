@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\mob_skull_skullBird_v2",
+  "states": [
+    "walk"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "walk",
+      "source": "frames",
+      "expected_frames": 4,
+      "found_frames": 4,
+      "natural_pose_count": 4,
+      "frame_files": [
+        "frames/walk/frame-0.png",
+        "frames/walk/frame-1.png",
+        "frames/walk/frame-2.png",
+        "frames/walk/frame-3.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9341120905140515,
+          "mean": 0.9525209434678147
+        },
+        "dhash_similarity": {
+          "min": 0.640625,
+          "mean": 0.7317708333333334
+        },
+        "motion_presence": 0.12705532896752453,
+        "centroid_sigma": {
+          "x": 8.821126248074153,
+          "y": 13.00784505314536
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

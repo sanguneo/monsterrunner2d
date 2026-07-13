@@ -12,6 +12,7 @@ import type { BossPhaseConfig } from '../data/config';
 import type { BossDef, PatternDef } from '../data/worlds';
 import type { Game } from '../core/Game';
 import { pickThreatLanes } from '../core/rules';
+import { drawSprite, drawTinted, drawAnim } from '../systems/Sprites';
 
 type BossState =
   'intro' | 'gap' | 'telegraph' | 'active' | 'recovery' | 'stagger' | 'vanish' | 'reappear' | 'phasechange' | 'dead';
@@ -621,6 +622,88 @@ export class Boss {
     if (fade <= 0) return;
 
     ctx.save();
+    if (!this.drawSpriteBody(ctx, sx, groundY, ppu, fade)) {
+      this.drawShapeBody(ctx, sx, groundY, ppu, fade);
+    }
+    ctx.globalAlpha = fade;
+
+    // 경직(약점) 빨간 외곽 링 (§9.4)
+    if (this.staggered) {
+      const pulse = 0.35 + Math.abs(Math.sin(this.bobT * 8)) * 0.35;
+      ctx.strokeStyle = `rgba(255,34,34,${pulse})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(sx, groundY - 1.4 * ppu, 1.25 * ppu, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /** boss_<id> 스프라이트를 visual 파츠 바운딩박스에 맞춰 그린다(좌향, 발밑 정렬). 로드 전이면 false. */
+  private drawSpriteBody(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    groundY: number,
+    ppu: number,
+    fade: number,
+  ): boolean {
+    const name = `boss_${this.def.id}`;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of this.def.visual) {
+      const cx = sx + p.pos[0] * ppu;
+      const cy = groundY - p.pos[1] * ppu;
+      let hw = 0;
+      let hy = 0;
+      switch (p.geo) {
+        case 'box':
+          hw = (p.size[0] * ppu) / 2;
+          hy = (p.size[1] * ppu) / 2;
+          break;
+        case 'sphere':
+        case 'ico':
+          hw = p.size[0] * ppu;
+          hy = p.size[0] * ppu;
+          break;
+        case 'capsule':
+          hw = p.size[0] * ppu;
+          hy = (p.size[1] * ppu) / 2 + p.size[0] * ppu;
+          break;
+        case 'cone':
+          hw = p.size[0] * ppu;
+          hy = (p.size[1] * ppu) / 2;
+          break;
+        case 'cylinder':
+          hw = Math.max(p.size[0], p.size[1]) * ppu;
+          hy = (p.size[2] * ppu) / 2;
+          break;
+      }
+      minX = Math.min(minX, cx - hw);
+      maxX = Math.max(maxX, cx + hw);
+      minY = Math.min(minY, cy - hy);
+      maxY = Math.max(maxY, cy + hy);
+    }
+    if (!Number.isFinite(minX)) return false;
+    const cx = (minX + maxX) / 2;
+    const isStageOneBoss = this.def.id === 'ghostTeacher' || this.def.id === 'ghostGirl';
+    const h = (maxY - minY) * (isStageOneBoss ? 1.28 : 1.18);
+    // 애니 아틀라스('idle') 우선 → 정적 단일 PNG. 둘 다 없으면 false(호출부가 도형 조립 폴백).
+    if (drawAnim(ctx, name, 'idle', this.bobT, cx, maxY, { height: h, flip: true, alpha: fade, groundContact: true }))
+      return true;
+    return drawSprite(ctx, name, cx, maxY, { height: h, flip: true, alpha: fade, groundContact: true });
+  }
+
+  /** 폴백: def.visual 파츠를 단순 도형으로 근사해 그린다(스프라이트 로드 전). */
+  private drawShapeBody(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    groundY: number,
+    ppu: number,
+    fade: number,
+  ): void {
     for (const p of this.def.visual) {
       const cx = sx + p.pos[0] * ppu;
       const cy = groundY - p.pos[1] * ppu;
@@ -669,19 +752,6 @@ export class Boss {
         }
       }
     }
-    ctx.globalAlpha = fade;
-
-    // 경직(약점) 빨간 외곽 링 (§9.4)
-    if (this.staggered) {
-      const pulse = 0.35 + Math.abs(Math.sin(this.bobT * 8)) * 0.35;
-      ctx.strokeStyle = `rgba(255,34,34,${pulse})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(sx, groundY - 1.4 * ppu, 1.25 * ppu, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    ctx.restore();
   }
 
   // ----------------------------------------------------------
@@ -802,21 +872,31 @@ export class Boss {
     if (this.state === 'active' && def) {
       if (def.type === 'wave' && this.waveZ !== null) {
         const sx = worldToScreenX(this.waveZ, scrollWorldX);
-        const bandW = 34;
-        const color = hex(def.color ?? 0xff5555);
+        const colorN = def.color ?? 0xff5555;
+        const half = CONFIG.render.laneSpacingPx * 0.42;
         for (const lane of this.targetLanes) {
           const baseY = laneY(lane);
-          const half = CONFIG.render.laneSpacingPx * 0.42;
+          // fx_wave 파동 이미지(색 틴트) — 로드 전이면 색 밴드 폴백.
+          if (drawTinted(ctx, 'fx_wave', colorN, sx, baseY, { height: half * 2.4, pivot: 'center', alpha: 0.9 })) {
+            continue;
+          }
           ctx.save();
           ctx.globalAlpha = 0.75;
-          ctx.fillStyle = color;
-          ctx.fillRect(sx - bandW / 2, baseY - half, bandW, half * 2);
+          ctx.fillStyle = hex(colorN);
+          ctx.fillRect(sx - 17, baseY - half, 34, half * 2);
           ctx.restore();
         }
       } else if (def.type === 'scream') {
-        const color = hex(def.color ?? 0xff66aa);
+        const colorN = def.color ?? 0xff66aa;
+        const px = CONFIG.render.playerAnchorX * CONFIG.render.logicalWidth;
         for (const lane of this.targetLanes) {
-          this.drawScreamRing(ctx, lane, 0.6, color, 30 + Math.abs(Math.sin(this.bobT * 6)) * 22);
+          const baseY = laneY(lane);
+          const radius = 30 + Math.abs(Math.sin(this.bobT * 6)) * 22;
+          // fx_scream 음파 링(색 틴트) — 로드 전이면 링 도형 폴백.
+          if (drawTinted(ctx, 'fx_scream', colorN, px, baseY, { height: radius * 2, pivot: 'center', alpha: 0.8 })) {
+            continue;
+          }
+          this.drawScreamRing(ctx, lane, 0.6, hex(colorN), radius);
         }
       } else if (def.type === 'chase') {
         this.drawChaseMarker(ctx, this.chaseLane, 0.85 + Math.abs(Math.sin(this.bobT * 12)) * 0.15);

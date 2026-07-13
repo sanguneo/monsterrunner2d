@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "boss_ghostTeacher",
+    "description": "right-facing ghost teacher boss, gray tattered suit, white swept hair, green chalkboard held in front, friendly spooky school ghost",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 20,
+    "safe_margin_y": 20,
+    "size": 256,
+    "safe_margin": 20
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "selection": "auto",
+    "score": 214.14,
+    "min_subject_distance": 210.91,
+    "background": {
+      "mode": "transparent",
+      "opaque_border_fraction": 0.033,
+      "subject_pixels": 8062
+    },
+    "candidates": [
+      {
+        "name": "magenta",
+        "hex": "#FF00FF",
+        "score": 214.14,
+        "min_subject_distance": 210.91,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "green",
+        "hex": "#00FF00",
+        "score": 183.66,
+        "min_subject_distance": 176.8,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "cyan",
+        "hex": "#00FFFF",
+        "score": 195.79,
+        "min_subject_distance": 189.22,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "blue",
+        "hex": "#004DFF",
+        "score": 175.94,
+        "min_subject_distance": 170.17,
+        "clears_erase_radius": true
+      }
+    ],
+    "selection_reason": "highest 1st-percentile subject distance among the 4 candidate(s) clearing the 96 erase radius"
+  },
+  "states": {
+    "idle": {
+      "frames": 3,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle three-frame idle breathing and hover: the friendly spooky teacher gently rises, settles, and returns; coat tails and chalkboard prop shift slightly while feet share a stable baseline"
+    }
+  },
+  "style": "Match the attached player anchor and book-ghost reference exactly: cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, no photorealism, no vector-flat style, no anime key art, no pixel art.",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  }
+}

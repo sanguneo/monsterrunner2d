@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\mob_dracula_wolf_v3",
+  "states": [
+    "walk"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "walk",
+      "source": "frames",
+      "expected_frames": 4,
+      "found_frames": 4,
+      "natural_pose_count": 4,
+      "frame_files": [
+        "frames/walk/frame-0.png",
+        "frames/walk/frame-1.png",
+        "frames/walk/frame-2.png",
+        "frames/walk/frame-3.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9609089124704937,
+          "mean": 0.9763300388755052
+        },
+        "dhash_similarity": {
+          "min": 0.78125,
+          "mean": 0.8385416666666666
+        },
+        "motion_presence": 0.03883615132250817,
+        "centroid_sigma": {
+          "x": 8.648015112488086,
+          "y": 5.936232059857416
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

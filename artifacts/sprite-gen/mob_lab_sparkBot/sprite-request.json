@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "mob_lab_sparkBot",
+    "description": "cyan laboratory spark robot drone",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24,
+    "size": 256,
+    "safe_margin": 24
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "selection": "auto",
+    "score": 256.53,
+    "min_subject_distance": 249.11,
+    "background": {
+      "mode": "transparent",
+      "opaque_border_fraction": 0.0,
+      "subject_pixels": 484
+    },
+    "candidates": [
+      {
+        "name": "magenta",
+        "hex": "#FF00FF",
+        "score": 256.53,
+        "min_subject_distance": 249.11,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "green",
+        "hex": "#00FF00",
+        "score": 204.08,
+        "min_subject_distance": 189.59,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "cyan",
+        "hex": "#00FFFF",
+        "score": 25.63,
+        "min_subject_distance": 17.52,
+        "clears_erase_radius": false
+      },
+      {
+        "name": "blue",
+        "hex": "#004DFF",
+        "score": 84.08,
+        "min_subject_distance": 81.64,
+        "clears_erase_radius": false
+      }
+    ],
+    "selection_reason": "highest 1st-percentile subject distance among the 2 candidate(s) clearing the 96 erase radius"
+  },
+  "states": {
+    "walk": {
+      "frames": 4,
+      "fps": 9,
+      "loop": true,
+      "action": "readable four-frame right-facing hovering drone cycle: nose tilts, rotor fins alternate, body rises and settles slightly, no detached effects"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art.",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

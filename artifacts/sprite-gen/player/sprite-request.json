@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "player",
+    "description": "Cute child-friendly Halloween mini monster hunter, orange fox-like creature with one small horn, dark purple mane and tail accents, brown adventurer gear, and a short silver sword; strict side view facing right",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24,
+    "size": 256,
+    "safe_margin": 24
+  },
+  "chroma_key": {
+    "name": "green",
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "selection": "manual"
+  },
+  "states": {
+    "run": {
+      "frames": 6,
+      "fps": 12,
+      "loop": true,
+      "action": "fast readable right-facing run cycle with six distinct phases: right-foot contact, passing, left-foot contact, passing, and two clear in-betweens; legs alternate, free arm counter-swings, sword stays firmly in the front hand and bobs safely with the body, tail and mane bounce; frame 6 flows naturally back to frame 1; feet share a stable ground baseline"
+    },
+    "jump": {
+      "frames": 3,
+      "fps": 12,
+      "loop": false,
+      "action": "three-part right-facing jump sequence: frame 1 compact crouch and anticipation, frame 2 clear airborne rise with tucked legs, frame 3 descending landing-ready pose; sword remains firmly held; readable start-middle-end progression"
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false,
+      "action": "two-part right-facing hurt reaction: frame 1 normal braced stance, frame 2 small backward recoil and flinch with a restrained warm red accent on the body only; sword remains firmly held; no blood, gore, detached effects, or extra props"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

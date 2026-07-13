@@ -7,6 +7,7 @@
 import { CONFIG } from '../data/config';
 import type { Action, Input } from '../core/Input';
 import type { SoundId } from '../systems/Sound';
+import { sprite, drawSprite, drawTinted, drawAnim, animFrameAt, isAnimReady, socketScreenPos } from '../systems/Sprites';
 
 function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
@@ -21,6 +22,11 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y + h, x, y, rr);
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
+}
+
+function attachmentSpriteName(kind: 'cape' | 'hat', equippedName: string): string {
+  const id = equippedName.startsWith(`${kind}_`) ? equippedName.slice(kind.length + 1) : equippedName;
+  return `attach_${kind}_${id}`;
 }
 
 export class Player {
@@ -46,6 +52,12 @@ export class Player {
   dashTimer = 0; // 무적 대시 잔여 시간
   alive = true;
 
+  // --- 애니메이션 상태 (아틀라스 재생용) ---
+  // 비루프 상태(jump/hit)는 상태 진입 시점부터의 경과시간이 필요하다 —
+  // 전역 누적 시간(this.time)을 쓰면 frameIndexAt이 항상 마지막 프레임으로 클램프된다.
+  private animName: 'run' | 'jump' | 'hit' = 'run';
+  private animT = 0;
+
   // --- view (2D draw용 스칼라 상태) ---
   /** 달리기 바운스 반영 몸통 y (§3.1) */
   private bodyY = 0.8;
@@ -55,26 +67,33 @@ export class Player {
   private capeWave = 0.25;
   /** 모자 색상(hex) — 미장착이면 null (§12) */
   private hatColorHex: number | null = null;
+  /** 망토/모자 스프라이트 파일명 — 미장착이면 null (§인수인계 2·5) */
+  private capeSpriteName: string | null = null;
+  private hatSpriteName: string | null = null;
   private time = 0;
   /** 동작 성공 시 효과음 재생 훅 (Game이 SoundManager로 연결) */
   sfx: ((id: SoundId) => void) | null = null;
 
-  /** 망토 장착 외형 (§12) — Cosmetics에서 호출. 색상은 보상 아이템별. */
-  equipCape(color: number): void {
+  /** 망토 장착 외형 (§12) — Cosmetics 호출. color=폴백 도형색, spriteName=오버레이 파일명. */
+  equipCape(color: number, spriteName: string | null = null): void {
     this.capeColorHex = color;
+    this.capeSpriteName = spriteName;
   }
 
   unequipCape(): void {
     this.capeColorHex = null;
+    this.capeSpriteName = null;
   }
 
   /** 모자 장착 외형 (§12 모자 슬롯) */
-  equipHat(color: number): void {
+  equipHat(color: number, spriteName: string | null = null): void {
     this.hatColorHex = color;
+    this.hatSpriteName = spriteName;
   }
 
   unequipHat(): void {
     this.hatColorHex = null;
+    this.hatSpriteName = null;
   }
 
   get hasCape(): boolean {
@@ -133,6 +152,16 @@ export class Player {
     if (this.queuedAction && allowControl) {
       const a = this.queuedAction;
       if (this.tryAction(a)) this.queuedAction = null;
+    }
+
+    // 애니 상태 결정 + per-state 타이머 (jump/hit 비루프 시퀀스 재생용)
+    const anim: 'run' | 'jump' | 'hit' =
+      this.hopTime >= 0 ? 'jump' : this.invulnTimer > 0 && this.dashTimer <= 0 ? 'hit' : 'run';
+    if (anim !== this.animName) {
+      this.animName = anim;
+      this.animT = 0;
+    } else {
+      this.animT += dt;
     }
 
     this.updateView();
@@ -208,7 +237,19 @@ export class Player {
     this.queuedAction = null;
     this.hopTime = -1;
     this.hopY = 0;
+    this.animName = 'run';
+    this.animT = 0;
     this.alive = true;
+  }
+
+  /** 현재 애니 상태명 (draw/테스트용) — run | jump | hit */
+  get animState(): string {
+    return this.animName;
+  }
+
+  /** 현재 애니 상태 진입 후 경과시간(초) — 비루프 시퀀스 재생 기준 */
+  get animTime(): number {
+    return this.animT;
   }
 
   private updateView(): void {
@@ -266,6 +307,82 @@ export class Player {
     ctx.beginPath();
     ctx.ellipse(sx, baseY + 3, w * 0.5 * shScale, 5 * shScale, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // 스프라이트 경로: 망토(뒤) → 몸 → 모자(앞), 96 프레임 공유.
+    //   몸 = 애니 아틀라스('player' 그룹) 우선 → 없으면 정적 player_idle(대시 시 청색 틴트).
+    //   애니 상태: 점프 중 'jump' / 피격 무적 중 'hit' / 그 외 'run'. (매니페스트에 없으면 idle 폴백)
+    const H = 88;
+    const animReady = isAnimReady('player');
+    if (animReady || sprite('player_idle')) {
+      const animFrame = animReady ? animFrameAt('player', this.animName, this.animT) : null;
+
+      let capeDrawn = false;
+      if (this.capeSpriteName && animFrame) {
+        const socket = socketScreenPos('player', animFrame.state, animFrame.frame, 'back', {
+          cx: sx,
+          anchorY: footY,
+          height: H,
+        });
+        if (socket) {
+          capeDrawn = drawSprite(ctx, attachmentSpriteName('cape', this.capeSpriteName), socket.x, socket.y + H * 0.42, {
+            height: H * 0.82,
+          });
+        }
+      }
+      if (!capeDrawn && this.capeSpriteName) drawSprite(ctx, this.capeSpriteName, sx, footY, { height: H });
+
+      if (!this.capeSpriteName && this.capeColorHex !== null) {
+        ctx.fillStyle = hex(this.capeColorHex);
+        ctx.beginPath();
+        ctx.moveTo(sx - w * 0.4, bodyTop + h * 0.1);
+        ctx.lineTo(sx + w * 0.4, bodyTop + h * 0.1);
+        ctx.lineTo(sx, footY + 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      const animResult = animFrame
+        ? drawAnim(ctx, 'player', this.animName, this.animT, sx, footY, { height: H, groundContact: true })
+        : null;
+
+      if (!animResult && this.dashTimer > 0) {
+        drawTinted(ctx, 'player_idle', 0x8fd0ff, sx, footY, { height: H, groundContact: true });
+      } else if (!animResult) {
+        drawSprite(ctx, 'player_idle', sx, footY, { height: H, groundContact: true });
+      }
+
+      let hatDrawn = false;
+      if (this.hatSpriteName && animResult) {
+        const socket = socketScreenPos('player', animResult.state, animResult.frame, 'head', {
+          cx: sx,
+          anchorY: footY,
+          height: H,
+        });
+        if (socket) {
+          hatDrawn = drawSprite(
+            ctx,
+            attachmentSpriteName('hat', this.hatSpriteName),
+            socket.x,
+            socket.y + H * (54 / 96),
+            { height: H },
+          );
+        }
+      }
+      if (!hatDrawn && this.hatSpriteName) drawSprite(ctx, this.hatSpriteName, sx, footY, { height: H });
+
+      if (!this.hatSpriteName && this.hatColorHex !== null) {
+        const headR = w * 0.36;
+        const headCy = bodyTop - headR * 0.6;
+        ctx.fillStyle = hex(this.hatColorHex);
+        ctx.beginPath();
+        ctx.moveTo(sx - headR * 0.9, headCy - headR * 0.4);
+        ctx.lineTo(sx + headR * 0.9, headCy - headR * 0.4);
+        ctx.lineTo(sx, headCy - headR * 2.1);
+        ctx.closePath();
+        ctx.fill();
+      }
+      return;
+    }
 
     // 망토
     const capeColor = this.capeColor;

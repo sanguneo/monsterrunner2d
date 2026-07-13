@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../data/config';
 import type { EnemyProjShape } from '../data/worlds';
+import { drawTinted } from '../systems/Sprites';
 
 function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
@@ -85,6 +86,11 @@ export class Projectile {
       ctx.fill();
     } else {
       ctx.rotate(this.rot);
+      // fx_proj_<shape>를 색 틴트해 그린다(로드 전이면 도형 폴백).
+      if (drawTinted(ctx, `fx_proj_${this.enemyShape}`, this.enemyColor, 0, 0, { pivot: 'center' })) {
+        ctx.restore();
+        return;
+      }
       ctx.fillStyle = hex(this.enemyColor);
       switch (this.enemyShape) {
         case 'ball':

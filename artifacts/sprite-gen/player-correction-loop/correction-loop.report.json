@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "kind": "sprite-gen-correction-loop-report",
+  "dry_run": true,
+  "min_attempts": 1,
+  "max_passes": 3,
+  "attempts": [
+    {
+      "attempt": 1,
+      "run_dir": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player",
+      "inspect_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\inspect.json",
+      "score_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\score.json",
+      "hint_file": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\correction-hints.txt",
+      "ok": true,
+      "overall_score": 100.0,
+      "candidate_rank": 1100
+    }
+  ],
+  "best_candidate": {
+    "attempt": 1,
+    "run_dir": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player",
+    "inspect_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\inspect.json",
+    "score_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\score.json",
+    "hint_file": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player-correction-loop\\attempt-1\\correction-hints.txt",
+    "ok": true,
+    "overall_score": 100.0,
+    "candidate_rank": 1100
+  },
+  "preserved_best": null
+}

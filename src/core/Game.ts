@@ -33,6 +33,7 @@ import type { SoundId } from '../systems/Sound';
 import { HUD } from '../ui/HUD';
 import { Screens } from '../ui/Screens';
 import { uiIcon, worldThemeIcon } from '../ui/icons';
+import { preload, preloadAnim, setCurrentWorld, drawSprite, COMMON_SPRITES } from '../systems/Sprites';
 
 export type GameStateName =
   'TITLE' | 'TUTORIAL' | 'RUNNING_1' | 'MIDBOSS' | 'RUNNING_2' | 'FINALBOSS' | 'REWARD' | 'RESULT' | 'GAMEOVER';
@@ -109,6 +110,8 @@ export class Game {
     this.setMood('normal');
 
     this.env = new Environment();
+    preload(COMMON_SPRITES);
+    this.preloadWorldSprites();
     this.cameraCtl = new CameraController(window.innerWidth / window.innerHeight);
 
     this.player = new Player();
@@ -211,18 +214,38 @@ export class Game {
       const playerSx = worldToScreenX(this.player.worldX, cameraCtl.scrollWorldX);
       if (onScreen(playerSx)) this.player.draw(ctx, playerSx, laneY(this.player.laneVisual));
 
-      // 광역 폭발 이펙트 — 확산하는 원 (§8.1, Combat이 데이터만 갖고 있고 여기서 그린다)
+      // 광역 폭발 이펙트 — fx_blast 이미지(없으면 확산 원) (§8.1)
       for (const f of this.combat.fx) {
         const sx = worldToScreenX(f.worldX, cameraCtl.scrollWorldX);
         if (!onScreen(sx)) continue;
         const baseY = laneY(f.lane);
         const t2 = f.age / f.life;
         const r = 10 + t2 * 90;
+        const alpha = Math.max(0, 1 - t2);
+        if (drawSprite(ctx, 'fx_blast', sx, baseY - 18, { height: r * 2, pivot: 'center', alpha })) continue;
         ctx.beginPath();
-        ctx.strokeStyle = `rgba(255,167,38,${Math.max(0, 1 - t2)})`;
+        ctx.strokeStyle = `rgba(255,167,38,${alpha})`;
         ctx.lineWidth = 4;
         ctx.arc(sx, baseY - 18, r, 0, Math.PI * 2);
         ctx.stroke();
+      }
+
+      // 명중 스파크 — fx_hit 이미지(없으면 작은 노란 스파크)
+      for (const f of this.combat.hitFx) {
+        const sx = worldToScreenX(f.worldX, cameraCtl.scrollWorldX);
+        if (!onScreen(sx)) continue;
+        const cy = laneY(f.lane) - 12;
+        const k = f.age / f.life;
+        const alpha = Math.max(0, 1 - k);
+        const size = 32 * (0.7 + k * 0.7);
+        if (drawSprite(ctx, 'fx_hit', sx, cy, { height: size, pivot: 'center', alpha })) continue;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ffe066';
+        ctx.beginPath();
+        ctx.arc(sx, cy, 6 * (1 - k) + 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     });
 
@@ -287,7 +310,30 @@ export class Game {
   private applyWorldTheme(): void {
     this.env.setTheme(this.world.theme);
     applyObstacleTheme(this.world.theme);
+    this.preloadWorldSprites();
     this.setMood('normal');
+  }
+
+  /** 현재 월드의 스프라이트(환경/몹/장애물/보스)를 프리로드하고 currentWorld를 설정한다. */
+  private preloadWorldSprites(): void {
+    const world = this.world;
+    setCurrentWorld(world.id);
+    preload([
+      `env_${world.id}_far`,
+      `env_${world.id}_near`,
+      `env_${world.id}_floor`,
+      `obstacle_block_${world.id}`,
+      `obstacle_mover_${world.id}`,
+      ...world.monsters.map((m) => `mob_${world.id}_${m.id}`),
+      `boss_${world.midBoss.id}`,
+      `boss_${world.finalBoss.id}`,
+    ]);
+    preloadAnim([
+      'player',
+      ...world.monsters.map((m) => `mob_${world.id}_${m.id}`),
+      `boss_${world.midBoss.id}`,
+      `boss_${world.finalBoss.id}`,
+    ]);
   }
 
   get inTutorial(): boolean {
@@ -838,11 +884,26 @@ export class Game {
     this.stats.bossKills += 1;
     this.progression.addExp(this.boss.def.expReward);
     this.hud.showBanner(t('misc.victory'), 1.4);
-    this.setState(this.state === 'MIDBOSS' ? 'RUNNING_2' : 'REWARD');
+    if (this.state === 'MIDBOSS') {
+      // 중간보스 처치 = 스테이지 진행 마일스톤 → 이 월드 테마 장비 착용, 외형이 즉시 바뀐다 (진행형 착용, §12 계획개정)
+      this.equipWorldCosmetic();
+      this.setState('RUNNING_2');
+    } else {
+      this.setState('REWARD');
+    }
   }
 
   onRewardDone(): void {
     this.setState('RESULT');
+  }
+
+  /** 현재 월드 테마 장비를 인벤토리에 반영하고 즉시 외형에 적용한다(스테이지 진행형 착용, 영구 지급은 REWARD에서). */
+  private equipWorldCosmetic(): void {
+    const rewardId = this.world.reward;
+    const item = REWARD_ITEMS[rewardId];
+    if (!item) return;
+    this.inventory.grantItem(rewardId, item.slot);
+    this.cosmetics.apply(this.player, this.inventory);
   }
 
   // ----------------------------------------------------------

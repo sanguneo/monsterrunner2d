@@ -11,11 +11,11 @@ export class Cosmetics {
   /** 인벤토리 장비 상태를 플레이어 외형에 반영 */
   apply(player: Player, inventory: Inventory): void {
     const cape = inventory.equipment.cape ? REWARD_ITEMS[inventory.equipment.cape] : null;
-    if (cape) player.equipCape(cape.color);
+    if (cape) player.equipCape(cape.color, cape.sprite ?? null);
     else player.unequipCape();
 
     const hat = inventory.equipment.hat ? REWARD_ITEMS[inventory.equipment.hat] : null;
-    if (hat) player.equipHat(hat.color);
+    if (hat) player.equipHat(hat.color, hat.sprite ?? null);
     else player.unequipHat();
   }
 }

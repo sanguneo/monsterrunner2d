@@ -88,6 +88,8 @@ export interface RewardItemDef {
   color: number;
   emoji: string;
   nameKey: string;
+  /** 착용 스프라이트 파일명(public/assets/sprites) — 없으면 색 도형 폴백 */
+  sprite?: string;
 }
 
 export interface WorldTheme {
@@ -170,12 +172,18 @@ export const TITLE_BG_IMAGE = `${ASSET_BASE}assets/images/title_bg.webp`;
 // ---------- 보상 아이템 ----------
 
 export const REWARD_ITEMS: Record<string, RewardItemDef> = {
-  ghost_cape: { slot: 'cape', color: 0xcfe8ff, emoji: '🧥', nameKey: 'reward.ghost_cape' },
-  zombie_hat: { slot: 'hat', color: 0x3f6212, emoji: '🎩', nameKey: 'reward.zombie_hat' },
-  lightning_helmet: { slot: 'hat', color: 0xfde047, emoji: '⛑️', nameKey: 'reward.lightning_helmet' },
-  seawitch_crown: { slot: 'hat', color: 0x22d3ee, emoji: '👑', nameKey: 'reward.seawitch_crown' },
-  dracula_cape: { slot: 'cape', color: 0x7f1d1d, emoji: '🦇', nameKey: 'reward.dracula_cape' },
-  skull_crown: { slot: 'hat', color: 0xe7e5e4, emoji: '👑', nameKey: 'reward.skull_crown' },
+  ghost_cape: { slot: 'cape', color: 0xcfe8ff, emoji: '🧥', nameKey: 'reward.ghost_cape', sprite: 'cape_ghost' },
+  zombie_hat: { slot: 'hat', color: 0x3f6212, emoji: '🎩', nameKey: 'reward.zombie_hat', sprite: 'hat_zombie' },
+  lightning_helmet: {
+    slot: 'hat',
+    color: 0xfde047,
+    emoji: '⛑️',
+    nameKey: 'reward.lightning_helmet',
+    sprite: 'hat_lightning',
+  },
+  seawitch_crown: { slot: 'hat', color: 0x22d3ee, emoji: '👑', nameKey: 'reward.seawitch_crown', sprite: 'hat_seawitch' },
+  dracula_cape: { slot: 'cape', color: 0x7f1d1d, emoji: '🦇', nameKey: 'reward.dracula_cape', sprite: 'cape_dracula' },
+  skull_crown: { slot: 'hat', color: 0xe7e5e4, emoji: '👑', nameKey: 'reward.skull_crown', sprite: 'hat_skull' },
 };
 
 // ---------- 월드 데이터 ----------

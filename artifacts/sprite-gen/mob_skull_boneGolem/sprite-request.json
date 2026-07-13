@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "mob_skull_boneGolem",
+    "description": "",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24,
+    "size": 256,
+    "safe_margin": 24
+  },
+  "chroma_key": {
+    "name": "cyan",
+    "hex": "#00FFFF",
+    "rgb": [
+      0,
+      255,
+      255
+    ],
+    "selection": "auto",
+    "score": 239.3,
+    "min_subject_distance": 231.46,
+    "background": {
+      "mode": "transparent",
+      "opaque_border_fraction": 0.084,
+      "subject_pixels": 1389
+    },
+    "candidates": [
+      {
+        "name": "magenta",
+        "hex": "#FF00FF",
+        "score": 208.49,
+        "min_subject_distance": 207.41,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "green",
+        "hex": "#00FF00",
+        "score": 214.71,
+        "min_subject_distance": 212.62,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "cyan",
+        "hex": "#00FFFF",
+        "score": 239.3,
+        "min_subject_distance": 231.46,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "blue",
+        "hex": "#004DFF",
+        "score": 215.06,
+        "min_subject_distance": 208.97,
+        "clears_erase_radius": true
+      }
+    ],
+    "selection_reason": "highest 1st-percentile subject distance among the 4 candidate(s) clearing the 96 erase radius"
+  },
+  "states": {
+    "walk": {
+      "frames": 4,
+      "fps": 9,
+      "loop": true,
+      "action": "readable four-frame right-facing walk cycle with body bob, limb or prop sway, distinct gait poses, stable baseline and loop continuity"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art.",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

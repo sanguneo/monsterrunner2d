@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "boss_ghostGirl",
+    "description": "compact right-facing school ghost girl boss: pale face, dark purple hair mass, white dress, small red eye accent, child-friendly spooky silhouette",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 20,
+    "safe_margin_y": 20,
+    "size": 256,
+    "safe_margin": 20
+  },
+  "chroma_key": {
+    "name": "cyan",
+    "hex": "#00FFFF",
+    "rgb": [
+      0,
+      255,
+      255
+    ],
+    "selection": "auto",
+    "score": 231.28,
+    "min_subject_distance": 224.99,
+    "background": {
+      "mode": "transparent",
+      "opaque_border_fraction": 0.074,
+      "subject_pixels": 2937
+    },
+    "candidates": [
+      {
+        "name": "magenta",
+        "hex": "#FF00FF",
+        "score": 206.62,
+        "min_subject_distance": 203.1,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "green",
+        "hex": "#00FF00",
+        "score": 216.66,
+        "min_subject_distance": 207.3,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "cyan",
+        "hex": "#00FFFF",
+        "score": 231.28,
+        "min_subject_distance": 224.99,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "blue",
+        "hex": "#004DFF",
+        "score": 184.1,
+        "min_subject_distance": 176.74,
+        "clears_erase_radius": true
+      }
+    ],
+    "selection_reason": "highest 1st-percentile subject distance among the 4 candidate(s) clearing the 96 erase radius"
+  },
+  "states": {
+    "idle": {
+      "frames": 3,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle three-frame idle hover: a compact cute-spooky school ghost girl gently rises, settles, and returns; hair mass and dress hem shift slightly, stable baseline"
+    }
+  },
+  "style": "The attached player anchor is the strict style and proportion SSoT: cute-spooky child-friendly Halloween painterly cartoon, compact chibi silhouette, saturated colors, thick dark outline, soft fixed-top-light shading, readable at small game size. Preserve only the school-ghost-girl identity cues from the secondary reference; redraw every other visual decision in the player-anchor style. No realistic rendering, no flat vector/anime style, no thin outlines.",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  }
+}

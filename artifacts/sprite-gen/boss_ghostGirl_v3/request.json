@@ -1,0 +1,13 @@
+{
+  "states": {
+    "idle": {
+      "frames": 3,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle three-frame idle hover: a compact cute-spooky school ghost girl gently rises, settles, and returns; hair mass and dress hem shift slightly, stable baseline"
+    }
+  },
+  "style": "The attached player anchor is the strict style and proportion SSoT: cute-spooky child-friendly Halloween painterly cartoon, compact chibi silhouette, saturated colors, thick dark outline, soft fixed-top-light shading, readable at small game size. Preserve only the school-ghost-girl identity cues from the secondary reference; redraw every other visual decision in the player-anchor style. No realistic rendering, no flat vector/anime style, no thin outlines.",
+  "cell": { "width": 256, "height": 256, "safe_margin_x": 20, "safe_margin_y": 20 },
+  "fit": { "resample": "kcentroid", "align_x": "foot-centroid", "align_y": "bottom" }
+}

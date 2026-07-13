@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "kind": "sprite-gen-score-report",
+  "source_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\mob_skull_skullBird",
+  "overall_score": 100.0,
+  "candidate_rank": 400,
+  "rows": [
+    {
+      "state": "walk",
+      "score": 100.0,
+      "candidate_rank": 400,
+      "expected_frames": 4,
+      "found_frames": 4,
+      "errors": [],
+      "warnings": [],
+      "hints": []
+    }
+  ],
+  "hints": []
+}

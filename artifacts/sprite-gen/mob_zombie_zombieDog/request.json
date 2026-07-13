@@ -1,0 +1,13 @@
+{
+  "states": {
+    "walk": {
+      "frames": 4,
+      "fps": 9,
+      "loop": true,
+      "action": "fast readable four-frame right-facing straight walk cycle: quick alternating paws, compact body bob, ears and tail follow motion, stable feet baseline"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art.",
+  "cell": { "width": 256, "height": 256, "safe_margin_x": 24, "safe_margin_y": 24 },
+  "fit": { "resample": "kcentroid", "align_x": "foot-centroid", "align_y": "bottom" }
+}

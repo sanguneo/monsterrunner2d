@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../data/config';
 import type { Player } from './Player';
+import { drawSprite, currentWorld } from '../systems/Sprites';
 
 export type ObstacleType = 'BLOCK' | 'MOVER';
 
@@ -73,19 +74,38 @@ export class Obstacle {
     const ppu = CONFIG.render.ppu;
     const w = (this.type === 'BLOCK' ? 1.9 : 1.8) * ppu;
     const h = (this.type === 'BLOCK' ? 3.0 : 2.6) * ppu;
+
+    // 접지 그림자 — 벽이 트랙 바닥에 놓여 있음을 알린다(플레이어와 동일한 앵커, baseY+3)
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(sx, baseY + 3, w * 0.5, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 스프라이트 벽 — 발밑 baseY 중앙, 충돌 판정과 동일한 높이(h)로 고정. 로드 전이면 도형 폴백.
+    if (
+      drawSprite(ctx, `obstacle_${this.type === 'BLOCK' ? 'block' : 'mover'}_${currentWorld()}`, sx, baseY + 2, {
+        height: h,
+      })
+    ) {
+      if (this.type === 'MOVER') this.drawMoverArrow(ctx, sx, baseY - h * 0.55);
+      return;
+    }
+
     ctx.fillStyle = hex(this.type === 'BLOCK' ? blockColor : moverColor);
     ctx.fillRect(sx - w / 2, baseY - h, w, h);
     if (this.type === 'MOVER') {
-      // 이동 방향 화살표 힌트
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
-      ctx.beginPath();
-      const ay = baseY - h / 2;
-      const dir = this.moveDir;
-      ctx.moveTo(sx + dir * 10, ay);
-      ctx.lineTo(sx - dir * 6, ay - 8);
-      ctx.lineTo(sx - dir * 6, ay + 8);
-      ctx.closePath();
-      ctx.fill();
+      this.drawMoverArrow(ctx, sx, baseY - h / 2);
     }
+  }
+
+  /** MOVER 이동 방향 화살표 힌트 — sx/ay 중심에 삼각형. */
+  private drawMoverArrow(ctx: CanvasRenderingContext2D, sx: number, ay: number): void {
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath();
+    const dir = this.moveDir;
+    ctx.moveTo(sx + dir * 10, ay);
+    ctx.lineTo(sx - dir * 6, ay - 8);
+    ctx.lineTo(sx - dir * 6, ay + 8);
+    ctx.closePath();
+    ctx.fill();
   }
 }

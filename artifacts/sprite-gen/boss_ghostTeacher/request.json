@@ -1,0 +1,13 @@
+{
+  "states": {
+    "idle": {
+      "frames": 2,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle two-frame idle breathing and hover loop: body rises and settles, coat tails and smoke-like silhouette gently shift while feet and pivot remain stable"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art.",
+  "cell": { "width": 256, "height": 256, "safe_margin_x": 24, "safe_margin_y": 24 },
+  "fit": { "resample": "kcentroid", "align_x": "foot-centroid", "align_y": "bottom" }
+}

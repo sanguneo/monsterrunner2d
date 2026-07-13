@@ -1,0 +1,16 @@
+{
+  "image": "mob_school_bookGhost_atlas.png",
+  "pivot": "bottom",
+  "states": {
+    "walk": {
+      "fps": 9,
+      "loop": true,
+      "frames": [
+        { "x": 0, "y": 0, "w": 256, "h": 256 },
+        { "x": 256, "y": 0, "w": 256, "h": 256 },
+        { "x": 512, "y": 0, "w": 256, "h": 256 },
+        { "x": 768, "y": 0, "w": 256, "h": 256 }
+      ]
+    }
+  }
+}

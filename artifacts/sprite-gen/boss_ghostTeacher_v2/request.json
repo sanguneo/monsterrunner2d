@@ -1,0 +1,13 @@
+{
+  "states": {
+    "idle": {
+      "frames": 3,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle three-frame idle breathing and hover: the friendly spooky teacher gently rises, settles, and returns; coat tails and chalkboard prop shift slightly while feet share a stable baseline"
+    }
+  },
+  "style": "Match the attached player anchor and book-ghost reference exactly: cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, no photorealism, no vector-flat style, no anime key art, no pixel art.",
+  "cell": { "width": 256, "height": 256, "safe_margin_x": 20, "safe_margin_y": 20 },
+  "fit": { "resample": "kcentroid", "align_x": "foot-centroid", "align_y": "bottom" }
+}

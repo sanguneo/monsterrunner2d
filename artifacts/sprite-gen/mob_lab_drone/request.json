@@ -1,0 +1,13 @@
+{
+  "states": {
+    "walk": {
+      "frames": 4,
+      "fps": 9,
+      "loop": true,
+      "action": "buoyant readable four-frame right-facing weave locomotion: hover bob and gentle side-to-side body tilt, small propeller and antenna motion, no detached effects"
+    }
+  },
+  "style": "Cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, polished 2D raster art, no pixel art.",
+  "cell": { "width": 256, "height": 256, "safe_margin_x": 24, "safe_margin_y": 24 },
+  "fit": { "resample": "kcentroid", "align_x": "foot-centroid", "align_y": "bottom" }
+}

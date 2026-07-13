@@ -36,6 +36,8 @@ export class Combat {
 
   /** 광역 폭발 이펙트 목록 — Game.render가 소비(§3.1) */
   readonly fx: BlastFx[] = [];
+  /** 명중 스파크 이펙트 목록(fx_hit) — Game.render가 소비 */
+  readonly hitFx: BlastFx[] = [];
 
   private fireTimer = 0;
   private rapidActive = 0; // 연사 폭주 잔여 시간
@@ -49,6 +51,7 @@ export class Combat {
     this.rapidActive = 0;
     this.dashReadyIdle = 0;
     this.fx.length = 0;
+    this.hitFx.length = 0;
   }
 
   update(dt: number): void {
@@ -106,7 +109,7 @@ export class Combat {
     game.sound.play('shoot');
   }
 
-  /** 사정거리 내 가장 가까운 몬스터(또는 보스) 자동 타겟 — worldX/lane (§3.1) */
+  /** 사정거리 내 가장 가까운 몬스터(또는 보스) 자동 타겟 — 플레이어와 같은 줄만 조준 (§7.1) */
   private findTarget(): Target | null {
     const game = this.game;
     const p = game.player;
@@ -114,14 +117,14 @@ export class Combat {
     let bestDist = CONFIG.player.fireRange;
 
     for (const m of game.monsters) {
-      if (!m.alive || m.z < p.z - 0.5) continue;
+      if (!m.alive || m.lane !== p.lane || m.z < p.z - 0.5) continue;
       const d = m.z - p.z;
       if (d < bestDist) {
         bestDist = d;
         best = { worldX: m.z, lane: m.lane };
       }
     }
-    if (game.boss && game.boss.targetable) {
+    if (game.boss && game.boss.targetable && game.boss.currentLane === p.lane) {
       const d = game.boss.z - p.z;
       if (d < bestDist) {
         best = { worldX: game.boss.z, lane: game.boss.currentLane };
@@ -151,6 +154,7 @@ export class Combat {
             proj.alive = false;
             game.hud.floatTextWorld(m.z, m.lane, `${Math.round(proj.damage)}`, proj.isCrit ? 'crit' : 'dmg');
             game.sound.play('hitMonster');
+            this.spawnHitFx(m.z, m.lane);
             if (m.takeDamage(proj.damage)) game.onMonsterKilled(m);
             break;
           }
@@ -160,6 +164,7 @@ export class Combat {
           const boss = game.boss;
           if (proj.lane === boss.currentLane && Math.abs(proj.worldX - boss.z) < CONFIG.combat.bossHitRadius) {
             proj.alive = false;
+            this.spawnHitFx(boss.z, boss.currentLane);
             const dealt = boss.takeDamage(proj.damage);
             if (dealt > 0) {
               // 경직 중 데미지 숫자 확대·노란색 (§9.4)
@@ -389,11 +394,20 @@ export class Combat {
     this.fx.push({ worldX: p.worldX + 2, lane: p.lane, age: 0, life: 0.45 });
   }
 
+  private spawnHitFx(worldX: number, lane: number): void {
+    this.hitFx.push({ worldX, lane, age: 0, life: 0.16 });
+  }
+
   private updateFx(dt: number): void {
     for (let i = this.fx.length - 1; i >= 0; i--) {
       const f = this.fx[i];
       f.age += dt;
       if (f.age >= f.life) this.fx.splice(i, 1);
+    }
+    for (let i = this.hitFx.length - 1; i >= 0; i--) {
+      const f = this.hitFx[i];
+      f.age += dt;
+      if (f.age >= f.life) this.hitFx.splice(i, 1);
     }
   }
 }

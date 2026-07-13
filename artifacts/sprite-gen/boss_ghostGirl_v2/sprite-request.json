@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "boss_ghostGirl",
+    "description": "right-facing school ghost girl boss, white dress, long dark purple hair, small red eye accent, child-friendly spooky silhouette",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 20,
+    "safe_margin_y": 20,
+    "size": 256,
+    "safe_margin": 20
+  },
+  "chroma_key": {
+    "name": "green",
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "selection": "auto",
+    "score": 239.45,
+    "min_subject_distance": 214.33,
+    "background": {
+      "mode": "transparent",
+      "opaque_border_fraction": 0.016,
+      "subject_pixels": 11400
+    },
+    "candidates": [
+      {
+        "name": "magenta",
+        "hex": "#FF00FF",
+        "score": 204.93,
+        "min_subject_distance": 183.05,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "green",
+        "hex": "#00FF00",
+        "score": 239.45,
+        "min_subject_distance": 214.33,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "cyan",
+        "hex": "#00FFFF",
+        "score": 219.79,
+        "min_subject_distance": 208.45,
+        "clears_erase_radius": true
+      },
+      {
+        "name": "blue",
+        "hex": "#004DFF",
+        "score": 185.95,
+        "min_subject_distance": 164.41,
+        "clears_erase_radius": true
+      }
+    ],
+    "selection_reason": "highest 1st-percentile subject distance among the 4 candidate(s) clearing the 96 erase radius"
+  },
+  "states": {
+    "idle": {
+      "frames": 3,
+      "fps": 6,
+      "loop": true,
+      "action": "subtle three-frame idle hover: the child-friendly school ghost girl gently rises, settles, and returns; long hair sways as one attached silhouette and dress hem shifts slightly while feet share a stable baseline"
+    }
+  },
+  "style": "Match the attached player anchor and book-ghost reference exactly: cute-spooky child-friendly Halloween painterly cartoon game sprite, saturated colors, thick consistent dark outline, soft painted shading with fixed top light, compact readable silhouette, no photorealism, no vector-flat style, no anime key art, no pixel art.",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  }
+}

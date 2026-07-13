@@ -1,0 +1,112 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player",
+  "states": [
+    "run",
+    "jump",
+    "hit"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "run",
+      "source": "frames",
+      "expected_frames": 6,
+      "found_frames": 6,
+      "natural_pose_count": 6,
+      "frame_files": [
+        "frames/run/frame-0.png",
+        "frames/run/frame-1.png",
+        "frames/run/frame-2.png",
+        "frames/run/frame-3.png",
+        "frames/run/frame-4.png",
+        "frames/run/frame-5.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9279017292935294,
+          "mean": 0.9622161875383066
+        },
+        "dhash_similarity": {
+          "min": 0.671875,
+          "mean": 0.8177083333333334
+        },
+        "motion_presence": 0.08010359221813726,
+        "centroid_sigma": {
+          "x": 6.243263825567827,
+          "y": 2.797571755443475
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "state": "jump",
+      "source": "frames",
+      "expected_frames": 3,
+      "found_frames": 3,
+      "natural_pose_count": 3,
+      "frame_files": [
+        "frames/jump/frame-0.png",
+        "frames/jump/frame-1.png",
+        "frames/jump/frame-2.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9697882709340774,
+          "mean": 0.9755629031733594
+        },
+        "dhash_similarity": {
+          "min": 0.671875,
+          "mean": 0.7604166666666666
+        },
+        "motion_presence": 0.1022656010646446,
+        "centroid_sigma": {
+          "x": 6.839155416637501,
+          "y": 9.261303318874306
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "state": "hit",
+      "source": "frames",
+      "expected_frames": 2,
+      "found_frames": 2,
+      "natural_pose_count": 2,
+      "frame_files": [
+        "frames/hit/frame-0.png",
+        "frames/hit/frame-1.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9300915463503628,
+          "mean": 0.9300915463503628
+        },
+        "dhash_similarity": {
+          "min": 0.59375,
+          "mean": 0.59375
+        },
+        "motion_presence": 0.16070700252757353,
+        "centroid_sigma": {
+          "x": 17.605666429480323,
+          "y": 2.7691413862172993
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

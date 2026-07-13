@@ -1,0 +1,40 @@
+{
+  "ok": true,
+  "kind": "sprite-gen-score-report",
+  "source_report": "C:\\Users\\USER\\WebstormProjects\\m2d\\artifacts\\sprite-gen\\player",
+  "overall_score": 100.0,
+  "candidate_rank": 1100,
+  "rows": [
+    {
+      "state": "run",
+      "score": 100.0,
+      "candidate_rank": 600,
+      "expected_frames": 6,
+      "found_frames": 6,
+      "errors": [],
+      "warnings": [],
+      "hints": []
+    },
+    {
+      "state": "jump",
+      "score": 100.0,
+      "candidate_rank": 300,
+      "expected_frames": 3,
+      "found_frames": 3,
+      "errors": [],
+      "warnings": [],
+      "hints": []
+    },
+    {
+      "state": "hit",
+      "score": 100.0,
+      "candidate_rank": 200,
+      "expected_frames": 2,
+      "found_frames": 2,
+      "errors": [],
+      "warnings": [],
+      "hints": []
+    }
+  ],
+  "hints": []
+}

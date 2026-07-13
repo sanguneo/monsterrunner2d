@@ -32,3 +32,30 @@ describe('점프(§5) — hop / airborne', () => {
     expect(p.airborne).toBe(true);
   });
 });
+
+describe('애니 상태 — per-state 타이머 (비루프 jump/hit 시퀀스 재생)', () => {
+  it('run → jump 진입 시 animTime 0에서 다시 시작, 착지 후 run 복귀', () => {
+    const p = new Player();
+    step(p, 30); // run 상태로 0.5s 누적
+    expect(p.animState).toBe('run');
+    const runT = p.animTime;
+    expect(runT).toBeGreaterThan(0.4);
+
+    p.tryAction('jump');
+    step(p, 1);
+    expect(p.animState).toBe('jump');
+    expect(p.animTime).toBeLessThan(runT); // 전역 시간이 아니라 상태 진입 후 시간
+
+    step(p, 60); // 체공(0.55s) 종료 → 착지
+    expect(p.animState).toBe('run');
+  });
+
+  it('피격(무적) 중 hit 상태, 무적 해제 후 run 복귀', () => {
+    const p = new Player();
+    p.takeDamage(1); // invuln 0.5s 시작
+    step(p, 1);
+    expect(p.animState).toBe('hit');
+    step(p, 40); // 0.66s > hitInvuln(0.5s)
+    expect(p.animState).toBe('run');
+  });
+});

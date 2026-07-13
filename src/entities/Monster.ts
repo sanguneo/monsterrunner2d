@@ -6,6 +6,7 @@
 
 import { CONFIG } from '../data/config';
 import type { MonsterDef, MonsterBehavior, MonsterShape } from '../data/worlds';
+import { drawSprite, drawAnim, currentWorld } from '../systems/Sprites';
 
 function hex(n: number): string {
   return `#${n.toString(16).padStart(6, '0')}`;
@@ -21,6 +22,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
 }
+
+/**
+ * 스프라이트 표시 높이(월드 단위) — 행동 티어별 고정. ×ppu(24)로 화면 px 산출.
+ * 소스 PNG 해상도가 달라도 화면 크기를 일관되게 유지(크기 제각각 방지). 탱커 ≈ 플레이어, 위빙 최소.
+ */
+const MOB_HEIGHT_WU: Record<MonsterBehavior, number> = { slow: 3.7, straight: 3.0, weave: 2.4 };
 
 /** weave 몬스터가 홈 줄↔이웃 줄을 오가는 주기(초) — 스폰마다 0.4~0.6s 사이로 살짝 랜덤화 */
 const WEAVE_TOGGLE_INTERVAL = [0.4, 0.6] as const;
@@ -102,7 +109,22 @@ export class Monster {
   draw(ctx: CanvasRenderingContext2D, sx: number, baseY: number): void {
     const ppu = CONFIG.render.ppu;
     const wobble = Math.sin(this.t * 6) * 0.18;
-    const cy = baseY - 0.55 * ppu + Math.sin(this.t * 3) * 3;
+    const bob = Math.sin(this.t * 3) * 3;
+    const cy = baseY - 0.55 * ppu + bob;
+
+    // 접지 그림자 — 바닥(baseY)에 고정, 바운스로 살짝 축소돼 부유 높이를 표현
+    const shScale = 0.9 + Math.sin(this.t * 3) * 0.08;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(sx, baseY + 3, 0.42 * ppu * shScale, 5 * shScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 스프라이트 몸체 — 좌향(우향 원본 반전), 발밑 baseY 접지(groundContact로 프레임 하단 여백 보정), 티어별 고정 높이.
+    //   애니 아틀라스('walk') 우선 → 정적 단일 PNG → 도형 폴백.
+    const name = `mob_${currentWorld()}_${this.id}`;
+    const drawOpts = { flip: true, height: MOB_HEIGHT_WU[this.behavior] * ppu, groundContact: true };
+    if (drawAnim(ctx, name, 'walk', this.t, sx, baseY, drawOpts)) return;
+    if (drawSprite(ctx, name, sx, baseY, drawOpts)) return;
 
     ctx.save();
     ctx.translate(sx, cy);
