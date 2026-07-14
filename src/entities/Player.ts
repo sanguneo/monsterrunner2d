@@ -216,6 +216,12 @@ export class Player {
     return true;
   }
 
+  /** 피해 없이 피격 연출만 트리거(무적 점멸 + 'hit' 애니). 튜토리얼 무피해 피드백용. 이미 무적이면 무시. */
+  reactHit(): void {
+    if (this.invulnerable) return;
+    this.invulnTimer = CONFIG.run.hitInvuln;
+  }
+
   heal(amount: number): void {
     this.hp = Math.min(this.maxHp, this.hp + amount);
   }

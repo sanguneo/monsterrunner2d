@@ -195,7 +195,7 @@ export class Game {
         for (const m of this.monsters) {
           if (m.lane !== lane) continue;
           const sx = worldToScreenX(m.z, cameraCtl.scrollWorldX);
-          if (onScreen(sx)) m.draw(ctx, sx, baseY);
+          if (onScreen(sx)) m.draw(ctx, sx, laneY(m.laneVisual)); // 레인 이동 이징 반영(스냅 방지)
         }
         for (const pr of this.projectiles) {
           if (pr.lane !== lane) continue;
@@ -820,7 +820,16 @@ export class Game {
 
   /** 플레이어 피해 적용 — 튜토리얼 무피해 (§14) / 무적 처리 (§11.1) */
   damagePlayer(amount: number): boolean {
-    if (this.inTutorial && CONFIG.tutorial.noDamage) return false;
+    if (this.inTutorial && CONFIG.tutorial.noDamage) {
+      // 튜토리얼: HP는 깎지 않되 피격 연출만 재생(중복 방지 위해 무적 아닐 때만)
+      if (this.player.alive && !this.player.invulnerable) {
+        this.player.reactHit();
+        this.hud.damageFlash();
+        this.sound.play('hitPlayer');
+        this.cameraCtl.shake(0.08, 0.12);
+      }
+      return false;
+    }
     if (!this.player.alive) return false;
     const applied = this.player.takeDamage(amount);
     if (applied) {

@@ -32,6 +32,9 @@ const MOB_HEIGHT_WU: Record<MonsterBehavior, number> = { slow: 3.7, straight: 3.
 /** weave 몬스터가 홈 줄↔이웃 줄을 오가는 주기(초) — 스폰마다 0.4~0.6s 사이로 살짝 랜덤화 */
 const WEAVE_TOGGLE_INTERVAL = [0.4, 0.6] as const;
 
+/** weave 레인 이동 보간 시간(초) — 정수 줄 스냅 대신 smoothstep으로 부드럽게 활강 */
+const WEAVE_MOVE_TIME = 0.22;
+
 function randomWeaveInterval(): number {
   return WEAVE_TOGGLE_INTERVAL[0] + Math.random() * (WEAVE_TOGGLE_INTERVAL[1] - WEAVE_TOGGLE_INTERVAL[0]);
 }
@@ -60,6 +63,9 @@ export class Monster {
   private weaveTimer = randomWeaveInterval();
   /** weave: 현재 홈 줄에 있는지(false면 이웃 줄로 이동한 상태) */
   private weaveAtHome = true;
+  /** 레인 세로 보간용 출발 줄 인덱스 + 진행도(1=완료). 정수 줄 스냅 대신 부드럽게 이동. */
+  private laneFromIdx: number;
+  private laneT = 1;
 
   constructor(
     def: MonsterDef,
@@ -75,6 +81,7 @@ export class Monster {
     this.shape = def.shape;
     this.color = def.color;
     this.homeLane = lane;
+    this.laneFromIdx = lane;
     // 맨 위 줄(0)이면 아래로만, 맨 아래 줄(count-1)이면 위로만, 그 외는 랜덤 방향
     this.weaveDir = lane <= 0 ? 1 : lane >= CONFIG.lanes.count - 1 ? -1 : Math.random() < 0.5 ? -1 : 1;
   }
@@ -89,10 +96,24 @@ export class Monster {
       if (this.weaveTimer <= 0) {
         this.weaveTimer += randomWeaveInterval();
         this.weaveAtHome = !this.weaveAtHome;
-        this.lane = this.weaveAtHome ? this.homeLane : this.homeLane + this.weaveDir;
+        const target = this.weaveAtHome ? this.homeLane : this.homeLane + this.weaveDir;
+        if (target !== this.lane) {
+          this.laneFromIdx = this.lane; // 이징 출발점 = 현재 줄
+          this.lane = target; // 판정용 논리 줄은 즉시 목표로(플레이어와 동일 모델)
+          this.laneT = 0;
+        }
       }
     }
+    // 레인 세로 보간 진행 (스냅 방지)
+    if (this.laneT < 1) this.laneT = Math.min(1, this.laneT + dt / WEAVE_MOVE_TIME);
     this.y = 0.8 + Math.sin(this.t * 3) * 0.12;
+  }
+
+  /** 세로 보간 반영 연속 줄 값 — Game.render가 laneY(laneVisual)로 그린다(smoothstep 이징). */
+  get laneVisual(): number {
+    if (this.laneT >= 1) return this.lane;
+    const s = this.laneT * this.laneT * (3 - 2 * this.laneT);
+    return this.laneFromIdx + (this.lane - this.laneFromIdx) * s;
   }
 
   /** @returns true면 사망 */
