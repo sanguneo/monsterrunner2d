@@ -27,9 +27,9 @@ export const CONFIG = {
   },
 
   run: {
-    speedStart: 8,
-    speedMax: 16,
-    accel: 0.4,
+    speedStart: 6,
+    speedMax: 12,
+    accel: 0.3,
     hitInvuln: 0.5,
     // 점프(§5): 장애물(BLOCK/MOVER)·보스 지면 파동(wave)을 뛰어넘는다. 몬스터·투사체·벽·비명은 줄 이동으로.
     jumpAirTime: 0.55, // 체공 시간(초)
@@ -44,7 +44,7 @@ export const CONFIG = {
     monsterSpawnIntervalStart: 4.0,
     monsterSpawnIntervalEnd: 2.0,
     arenaBossDistance: 12,
-    tutorialSpeed: 5,
+    tutorialSpeed: 4,
     stageIntroDuration: 3.0, // 스테이지 인트로(월드 이미지) 표시 시간(초)
   },
 

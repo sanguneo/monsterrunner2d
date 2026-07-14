@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "player-sky-lamb",
+    "description": "Same locked character as the base anchor: cheerful tiny white lamb-rabbit adventurer with a huge curled white ear-horn ending in a bright blue spiral cap, one upright ear with a blue accent, large blue eyes, pink cheeks, blue scarf and trailing ribbon, curled tail with blue spiral, blue wrist cuffs, tan belt pouch with blue spiral emblem, and blue-white-pink sneakers; strict right-facing game side/three-quarter view."
+  },
+  "cell": {
+    "shape": "square",
+    "width": 256,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255],
+    "selection": "manual"
+  },
+  "states": {
+    "run": {
+      "frames": 6,
+      "fps": 12,
+      "loop": true,
+      "action": "right-facing six-phase run cycle: right-foot contact, passing, left-foot contact, passing, and two clear in-betweens; legs alternate, arms counter-swing, ears and scarf ribbon bounce, tail follows the body; frame 6 flows naturally back to frame 1; feet share a stable ground baseline"
+    },
+    "jump": {
+      "frames": 3,
+      "fps": 12,
+      "loop": false,
+      "action": "right-facing three-part jump sequence: compact crouch anticipation, clear airborne rise with tucked legs, descending landing-ready pose; scarf and ears follow body motion; readable start-middle-end progression"
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false,
+      "action": "right-facing two-part hurt reaction: normal braced stance then a small backward recoil and flinch; all character accessories remain attached; no blood, gore, detached effects, or extra props"
+    }
+  },
+  "style": "Cute polished Korean mobile-game cartoon sprite, white fur with saturated sky-blue accents, clean deep-violet outlines, soft cel shading, compact readable silhouette, non-pixel-art 2D raster",
+  "motion_phase_guides": false,
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "foot-centroid",
+    "align_y": "bottom"
+  }
+}
